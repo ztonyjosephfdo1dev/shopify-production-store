@@ -1,0 +1,6 @@
+# GitHub CODEOWNERS
+# This file controls who is required to review pull requests
+
+* @ztonyjosephfdo1dev
+theme/ @ztonyjosephfdo1dev
+docs/ @ztonyjosephfdo1dev
