@@ -1,0 +1,5 @@
+# shopify.theme.toml — Pookie Style Production Store
+name = "production-theme"
+store = "udfphb-uk.myshopify.com"
+password = "" # Never store here — use GitHub Secrets (SHOPIFY_API_TOKEN = shptka_...)
+theme_id = 135917666402

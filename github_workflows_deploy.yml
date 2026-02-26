@@ -1,0 +1,43 @@
+name: Deploy to Shopify (optional)
+
+on:
+  push:
+    branches:
+      - production
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: |
+          if [ -f package.json ]; then npm ci; fi
+
+      - name: Build assets
+        run: |
+          if [ -f package.json ] && npm run | grep -q build; then npm run build; fi
+
+      - name: Install Shopify CLI
+        run: npm install -g @shopify/cli@latest
+
+      - name: Deploy to Shopify
+        env:
+          SHOPIFY_STORE: ${{ secrets.SHOPIFY_STORE }}
+          SHOPIFY_API_TOKEN: ${{ secrets.SHOPIFY_API_TOKEN }}
+          SHOPIFY_THEME_ID: ${{ secrets.SHOPIFY_THEME_ID }}
+        run: |
+          # Uses Theme Access password (shptka_...) stored in GitHub Secrets
+          shopify theme push \
+            --store="$SHOPIFY_STORE" \
+            --password="$SHOPIFY_API_TOKEN" \
+            --theme-id="$SHOPIFY_THEME_ID" \
+            --allow-live
