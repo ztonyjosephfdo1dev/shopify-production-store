@@ -35,6 +35,37 @@ This document describes the logical architecture of the Shopify storefront, the 
 - GitHub Actions: optional hook to deploy built/packaged theme to Shopify via Shopify CLI.
 - External services (optional): analytics, payment gateways, fulfillment providers.
 
+## AI Product Creation Tool (v2.0)
+
+An admin-only Shopify page with a simple upload form. Backend runs on Google Cloud Functions (permanently free).
+
+### Architecture
+```
+Shopify Admin Page → Google Cloud Function (Python 3.11) → AI Services → Shopify GraphQL API
+```
+
+### Components
+- **Frontend:** Shopify Liquid section (`pookie-product-creator.liquid`) — vanilla JS + CSS, no external frameworks
+- **Backend:** Google Cloud Function (Python 3.11, HTTP trigger) — serverless, permanently free tier
+- **AI Vision + Text:** GPT-4.1-nano — single call: analyzes image + generates name, description, 35-50 tags, SEO, detects category/color/fabric
+- **BG Removal:** Photoroom API — removes background, creates white BG + styled AI background (preserves real product)
+- **Virtual Try-On:** Replicate VTON (prunaai/p-tryon or omnious/vella-1.5) — maps real garment onto Indian model
+- **Shopify Client:** GraphQL Admin API v2026-01 — creates products with images, variants, tags, collection assignment
+
+### Data Flow
+1. Staff uploads 1-3 raw phone photos + enters price/sizes (category optional)
+2. GPT-4.1-nano analyzes image → generates ALL text + detects garment attributes (one API call)
+3. Photoroom removes BG → white background (Image 1) + styled background (Image 2)
+4. Replicate VTON → garment on model (Image 3)
+5. Raw photo crop → detail/close-up (Image 4)
+6. Tool creates Shopify product via GraphQL (status: Draft)
+
+**Cost:** ~₹12/product | Hosting: ₹0/month (GCP free tier — permanent)
+
+See `docs/product-creation-tool.md` for full HLD v2.0 and requirements.
+
+---
+
 ## Considerations
 - Keep secret keys out of repo.
 - Use Shopify development store or duplicate theme for testing before publishing.

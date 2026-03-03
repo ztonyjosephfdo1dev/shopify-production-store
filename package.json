@@ -1,0 +1,22 @@
+{
+  "name": "shopify-production-store",
+  "version": "1.0.0",
+  "description": "Shopify production store theme management",
+  "main": "index.js",
+  "scripts": {
+    "dev": "shopify theme dev",
+    "backup": "bash scripts/backup.sh",
+    "push": "shopify theme push",
+    "list": "shopify theme list"
+  },
+  "keywords": [
+    "shopify",
+    "theme",
+    "ecommerce"
+  ],
+  "author": "ztonyjosephfdo1dev",
+  "license": "MIT",
+  "devDependencies": {
+    "@shopify/cli": "latest"
+  }
+}

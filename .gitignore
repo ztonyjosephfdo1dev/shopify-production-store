@@ -1,23 +1,32 @@
-# Node
-node_modules/
-npm-debug.log*
-
-# Build output
-dist/
-build/
-
-# Environment & secrets — NEVER commit these
+# Environment variables
 .env
 .env.local
-*.secret
+.env.*.local
 
 # Shopify CLI
-.shopify/
-shopify.theme.toml.bak
+.shopifyrc
+.shopifyrc.yml
+
+# Node dependencies
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
 
 # OS
-.DS_Store
 Thumbs.db
 
-# VS Code
-.vscode/settings.json
+# Logs
+logs/
+*.log
+
+# Temp files
+.tmp/
+temp/

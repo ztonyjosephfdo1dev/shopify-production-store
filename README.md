@@ -1,34 +1,65 @@
-# shopify-production-store
+# Shopify Production Store
 
-Repository intended to store Shopify theme code and project documentation for the production Shopify store owned by `ztonyjosephfdo1dev`.
+This repository contains the theme and configuration for the Shopify production store, with version control, automated deployment, and backup management.
 
-## Purpose
-- Keep theme code versioned
-- Host project docs (docs/)
-- Provide deployment and recovery runbooks
+## Features
 
-## Structure
-See `docs/requirements.md` and `docs/architecture.md` for full details.
+- 📦 Theme management with Shopify CLI
+- 🚀 Automated deployment via GitHub Actions
+- 💾 Automated backup strategy
+- 📝 Version control for all theme files
+- 🔄 Development/staging workflow
 
-## Getting Started
-1. Clone repo
-2. Install Shopify CLI
-3. Configure `shopify.theme.toml` with production store details (only after creating backups and duplicates)
-4. Use `docs/deployment-guide.md` before any push to production.
+## Quick Start
 
-## MCP Servers
-This project uses two Shopify MCP (Model Context Protocol) servers:
+### Prerequisites
+- [Shopify CLI](https://shopify.dev/docs/themes/tools/cli)
+- [Node.js](https://nodejs.org/) 14+
+- Git
 
-| Server | Purpose | Auth |
-|---|---|---|
-| **Dev MCP** (`@shopify/dev-mcp`) | AI-assisted theme development — Shopify docs, schema, Liquid validation | None |
-| **Storefront MCP** (`{store}.myshopify.com/api/mcp`) | Customer-facing AI shopping assistant — product search, cart, policies | None |
+### Installation
 
-- VS Code is pre-configured via `.vscode/mcp.json` — Storefront MCP is connected to `udfphb-uk.myshopify.com`.
-- See [docs_mcp-servers.md](docs_mcp-servers.md) for full setup instructions.
+```bash
+# Install dependencies
+npm install
 
-## Testing
-> **Note:** Automated test cases are not used in this project and are intentionally excluded from the workflow. Validation is handled via manual preview on a duplicate Shopify theme before publishing to production.
+# Authenticate with Shopify
+shopify auth login
 
-## Contact
-Owner: `ztonyjosephfdo1dev`
+# Pull the current live theme
+shopify theme pull --live
+
+# Start development
+shopify theme dev
+```
+
+## Folder Structure
+
+See [docs/requirements.md](docs/requirements.md) for detailed folder structure and action items.
+
+## Deployment
+
+See [docs/deployment.md](docs/deployment.md) for deployment instructions.
+
+## Backup & Recovery
+
+See [docs/backup-strategy.md](docs/backup-strategy.md) for backup procedures.
+
+## Documentation
+
+- [Setup Guide](docs/setup-guide.md)
+- [Deployment Guide](docs/deployment.md)
+- [Backup Strategy](docs/backup-strategy.md)
+- [Requirements & Action Items](docs/requirements.md)
+
+## Contributing
+
+1. Create a feature branch from `main`
+2. Make your changes
+3. Test in development store
+4. Submit pull request for review
+5. After approval, merge to `main` for deployment
+
+## Support
+
+For questions or issues, contact the project owner.
