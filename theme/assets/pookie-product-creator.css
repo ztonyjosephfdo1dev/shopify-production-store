@@ -1,0 +1,378 @@
+/* ============================================
+   Pookie Style — AI Product Creator Styles
+   Section: pookie-product-creator
+   ============================================ */
+
+.pookie-creator {
+  padding: 40px 20px;
+  max-width: 680px;
+  margin: 0 auto;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #1a1a1a;
+}
+
+/* --- Header --- */
+.pookie-creator__header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.pookie-creator__title {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0 0 8px;
+  color: #1a1a1a;
+}
+
+.pookie-creator__subtitle {
+  font-size: 15px;
+  color: #666;
+  margin: 0;
+}
+
+/* --- Form Fields --- */
+.pookie-creator__field {
+  margin-bottom: 24px;
+}
+
+.pookie-creator__field--half {
+  flex: 1;
+  min-width: 0;
+}
+
+.pookie-creator__row {
+  display: flex;
+  gap: 16px;
+}
+
+.pookie-creator__label {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #1a1a1a;
+}
+
+.pookie-creator__required {
+  color: #e53935;
+}
+
+.pookie-creator__optional {
+  font-weight: 400;
+  color: #999;
+  font-size: 12px;
+}
+
+.pookie-creator__hint {
+  font-size: 12px;
+  color: #999;
+  margin: 4px 0 8px;
+}
+
+.pookie-creator__input,
+.pookie-creator__textarea,
+.pookie-creator__select {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid #ddd;
+  border-radius: 8px;
+  font-size: 15px;
+  color: #1a1a1a;
+  background: #fff;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.pookie-creator__input:focus,
+.pookie-creator__textarea:focus,
+.pookie-creator__select:focus {
+  outline: none;
+  border-color: #b08968;
+  box-shadow: 0 0 0 3px rgba(176, 137, 104, 0.15);
+}
+
+.pookie-creator__textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* --- Dropzone --- */
+.pookie-creator__dropzone {
+  border: 2px dashed #ccc;
+  border-radius: 12px;
+  padding: 40px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  position: relative;
+}
+
+.pookie-creator__dropzone:hover,
+.pookie-creator__dropzone--active {
+  border-color: #b08968;
+  background: rgba(176, 137, 104, 0.04);
+}
+
+.pookie-creator__upload-icon {
+  color: #b08968;
+  margin-bottom: 12px;
+}
+
+.pookie-creator__browse {
+  color: #b08968;
+  text-decoration: underline;
+  font-weight: 600;
+}
+
+.pookie-creator__file-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* --- Image Previews --- */
+.pookie-creator__previews {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.pookie-creator__preview {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1.5px solid #ddd;
+}
+
+.pookie-creator__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pookie-creator__preview-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: none;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* --- Sizes --- */
+.pookie-creator__sizes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pookie-creator__size-chip {
+  cursor: pointer;
+}
+
+.pookie-creator__size-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pookie-creator__size-label {
+  display: inline-block;
+  padding: 8px 18px;
+  border: 1.5px solid #ddd;
+  border-radius: 24px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #666;
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.pookie-creator__size-input:checked + .pookie-creator__size-label {
+  background: #b08968;
+  border-color: #b08968;
+  color: #fff;
+}
+
+.pookie-creator__size-label:hover {
+  border-color: #b08968;
+  color: #b08968;
+}
+
+/* --- Submit Button --- */
+.pookie-creator__submit {
+  width: 100%;
+  padding: 14px;
+  background: #1a1a1a;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-top: 8px;
+}
+
+.pookie-creator__submit:hover {
+  background: #333;
+}
+
+.pookie-creator__submit:disabled {
+  background: #aaa;
+  cursor: not-allowed;
+}
+
+.pookie-creator__submit--another {
+  background: #b08968;
+  margin-top: 20px;
+}
+
+.pookie-creator__submit--another:hover {
+  background: #9a7558;
+}
+
+/* --- Progress --- */
+.pookie-creator__progress {
+  text-align: center;
+  padding: 40px 0;
+}
+
+.pookie-creator__progress-bar {
+  width: 100%;
+  height: 8px;
+  background: #eee;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.pookie-creator__progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #b08968, #d4a373);
+  border-radius: 4px;
+  transition: width 0.8s ease;
+}
+
+.pookie-creator__progress-text {
+  font-size: 15px;
+  color: #666;
+  animation: pookie-pulse 1.5s infinite;
+}
+
+@keyframes pookie-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* --- Success --- */
+.pookie-creator__success {
+  text-align: center;
+  padding: 40px 0;
+}
+
+.pookie-creator__success-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.pookie-creator__success h2 {
+  font-size: 22px;
+  margin: 0 0 8px;
+}
+
+.pookie-creator__success-name {
+  font-size: 18px;
+  color: #b08968;
+  font-weight: 600;
+  margin: 0 0 20px;
+}
+
+.pookie-creator__success-links {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.pookie-creator__link {
+  padding: 10px 20px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.pookie-creator__link--admin {
+  background: #1a1a1a;
+  color: #fff;
+}
+
+.pookie-creator__link--store {
+  background: #b08968;
+  color: #fff;
+}
+
+.pookie-creator__success-details {
+  text-align: left;
+  background: #f8f8f8;
+  border-radius: 10px;
+  padding: 16px 20px;
+  font-size: 14px;
+  line-height: 1.8;
+  color: #555;
+  margin-top: 16px;
+}
+
+/* --- Error --- */
+.pookie-creator__error {
+  text-align: center;
+  padding: 40px 0;
+}
+
+.pookie-creator__error-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.pookie-creator__error h2 {
+  color: #e53935;
+}
+
+/* --- Mobile --- */
+@media (max-width: 749px) {
+  .pookie-creator {
+    padding: 24px 16px;
+  }
+
+  .pookie-creator__title {
+    font-size: 22px;
+  }
+
+  .pookie-creator__row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .pookie-creator__dropzone {
+    padding: 24px 16px;
+  }
+
+  .pookie-creator__success-links {
+    flex-direction: column;
+    align-items: center;
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "sections": {
+    "main": {
+      "type": "pookie-product-creator",
+      "settings": {
+        "heading": "Create New Product",
+        "subheading": "Upload a photo and let AI do the rest. Product will be saved as Draft."
+      }
+    }
+  },
+  "order": ["main"]
+}

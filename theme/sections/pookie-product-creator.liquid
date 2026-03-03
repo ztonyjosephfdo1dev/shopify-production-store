@@ -1,0 +1,387 @@
+{% comment %}
+  Pookie Style — AI Product Creator
+  Admin-only page section for creating products from phone photos.
+  This page should be hidden from the storefront (Shopify Admin → Pages → Visibility: Hidden).
+{% endcomment %}
+
+{{ 'pookie-product-creator.css' | asset_url | stylesheet_tag }}
+
+<section class="pookie-creator" data-section-id="{{ section.id }}">
+  <div class="pookie-creator__container">
+    <header class="pookie-creator__header">
+      <h1 class="pookie-creator__title">{{ section.settings.heading }}</h1>
+      <p class="pookie-creator__subtitle">{{ section.settings.subheading }}</p>
+    </header>
+
+    <form id="pookie-creator-form" class="pookie-creator__form" enctype="multipart/form-data">
+      {%- comment -%} Image Upload {%- endcomment -%}
+      <div class="pookie-creator__field">
+        <label class="pookie-creator__label">
+          Product Photos <span class="pookie-creator__required">*</span>
+        </label>
+        <p class="pookie-creator__hint">Upload 1–3 photos (phone camera, hanger, flat-lay, mannequin)</p>
+        <div id="pookie-dropzone" class="pookie-creator__dropzone">
+          <div class="pookie-creator__dropzone-content">
+            <svg class="pookie-creator__upload-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            <p>Drag & drop photos here or <span class="pookie-creator__browse">browse</span></p>
+            <p class="pookie-creator__hint">JPG, PNG — max 10 MB each — up to 3 photos</p>
+          </div>
+          <input type="file" id="pookie-images" name="images" accept="image/jpeg,image/png,image/webp" multiple class="pookie-creator__file-input" />
+        </div>
+        <div id="pookie-previews" class="pookie-creator__previews"></div>
+      </div>
+
+      {%- comment -%} Price Fields {%- endcomment -%}
+      <div class="pookie-creator__row">
+        <div class="pookie-creator__field pookie-creator__field--half">
+          <label class="pookie-creator__label" for="pookie-price">
+            Selling Price (₹) <span class="pookie-creator__required">*</span>
+          </label>
+          <input type="number" id="pookie-price" name="price" class="pookie-creator__input" placeholder="599" min="1" required />
+        </div>
+        <div class="pookie-creator__field pookie-creator__field--half">
+          <label class="pookie-creator__label" for="pookie-compare-price">
+            Compare-at Price (₹) <span class="pookie-creator__required">*</span>
+          </label>
+          <input type="number" id="pookie-compare-price" name="compare_at_price" class="pookie-creator__input" placeholder="999" min="1" required />
+        </div>
+      </div>
+
+      {%- comment -%} Sizes {%- endcomment -%}
+      <div class="pookie-creator__field">
+        <label class="pookie-creator__label">
+          Sizes <span class="pookie-creator__required">*</span>
+        </label>
+        <div class="pookie-creator__sizes">
+          {%- assign size_options = "S,M,L,XL,XXL,Free Size" | split: "," -%}
+          {%- for size in size_options -%}
+            <label class="pookie-creator__size-chip">
+              <input type="checkbox" name="sizes" value="{{ size }}" class="pookie-creator__size-input" />
+              <span class="pookie-creator__size-label">{{ size }}</span>
+            </label>
+          {%- endfor -%}
+        </div>
+      </div>
+
+      {%- comment -%} Optional Fields {%- endcomment -%}
+      <div class="pookie-creator__field">
+        <label class="pookie-creator__label" for="pookie-name">Product Name <span class="pookie-creator__optional">(optional — AI generates if blank)</span></label>
+        <input type="text" id="pookie-name" name="name" class="pookie-creator__input" placeholder="e.g., Emerald Green A-Line Kurti" />
+      </div>
+
+      <div class="pookie-creator__field">
+        <label class="pookie-creator__label" for="pookie-description">Description / Notes <span class="pookie-creator__optional">(optional — AI uses to generate listing)</span></label>
+        <textarea id="pookie-description" name="description" class="pookie-creator__textarea" rows="3" placeholder="Any details: fabric, occasion, special features..."></textarea>
+      </div>
+
+      <div class="pookie-creator__field">
+        <label class="pookie-creator__label" for="pookie-category">Category <span class="pookie-creator__optional">(optional — AI auto-detects if blank)</span></label>
+        <select id="pookie-category" name="category" class="pookie-creator__select">
+          <option value="">AI will detect automatically</option>
+          <optgroup label="Ethnic Wear">
+            <option value="kurti">Kurti</option>
+            <option value="kurti-set">Kurti Set</option>
+            <option value="suits">Suits</option>
+            <option value="indo-western">Indo-Western</option>
+          </optgroup>
+          <optgroup label="Western Wear">
+            <option value="top-wear">Top Wear</option>
+            <option value="tops">Tops</option>
+            <option value="casual-top">Casual Top</option>
+            <option value="korean-top">Korean Top</option>
+            <option value="shirt">Shirt</option>
+            <option value="blouse">Blouse</option>
+            <option value="bodycon">Bodycon</option>
+            <option value="fancy-crop-top">Crop Top</option>
+          </optgroup>
+          <optgroup label="Dresses & Gowns">
+            <option value="single-piece">Single Piece / Dress</option>
+            <option value="gown">Gown</option>
+            <option value="maxi">Maxi</option>
+            <option value="casual-maxi">Casual Maxi</option>
+          </optgroup>
+          <optgroup label="Sets & Bottoms">
+            <option value="cord-set">Cord Set</option>
+            <option value="bottom">Bottom</option>
+            <option value="plazo">Palazzo</option>
+            <option value="skirt">Skirt</option>
+          </optgroup>
+          <optgroup label="Innerwear">
+            <option value="inners">Inners</option>
+          </optgroup>
+          <optgroup label="Beauty & Care">
+            <option value="skin-care">Skin Care</option>
+            <option value="face-wash">Face Wash</option>
+            <option value="body-lotion">Body Lotion</option>
+          </optgroup>
+        </select>
+      </div>
+
+      {%- comment -%} Submit {%- endcomment -%}
+      <button type="submit" id="pookie-submit" class="pookie-creator__submit">
+        <span class="pookie-creator__submit-text">🚀 Create Product</span>
+        <span class="pookie-creator__submit-loading" style="display:none;">Processing...</span>
+      </button>
+    </form>
+
+    {%- comment -%} Progress Indicator {%- endcomment -%}
+    <div id="pookie-progress" class="pookie-creator__progress" style="display:none;">
+      <div class="pookie-creator__progress-bar">
+        <div id="pookie-progress-fill" class="pookie-creator__progress-fill" style="width:0%"></div>
+      </div>
+      <p id="pookie-progress-text" class="pookie-creator__progress-text">Starting...</p>
+    </div>
+
+    {%- comment -%} Success Message {%- endcomment -%}
+    <div id="pookie-success" class="pookie-creator__success" style="display:none;">
+      <div class="pookie-creator__success-icon">✅</div>
+      <h2>Product Created Successfully!</h2>
+      <p id="pookie-success-name" class="pookie-creator__success-name"></p>
+      <div class="pookie-creator__success-links">
+        <a id="pookie-admin-link" href="#" target="_blank" class="pookie-creator__link pookie-creator__link--admin">View in Shopify Admin →</a>
+        <a id="pookie-store-link" href="#" target="_blank" class="pookie-creator__link pookie-creator__link--store">View on Store →</a>
+      </div>
+      <div id="pookie-success-details" class="pookie-creator__success-details"></div>
+      <button id="pookie-create-another" class="pookie-creator__submit pookie-creator__submit--another">Create Another Product</button>
+    </div>
+
+    {%- comment -%} Error Message {%- endcomment -%}
+    <div id="pookie-error" class="pookie-creator__error" style="display:none;">
+      <div class="pookie-creator__error-icon">❌</div>
+      <h2>Something went wrong</h2>
+      <p id="pookie-error-text"></p>
+      <button id="pookie-retry" class="pookie-creator__submit">Try Again</button>
+    </div>
+  </div>
+</section>
+
+<script>
+  (function() {
+    'use strict';
+
+    var BACKEND_URL = '{{ section.settings.backend_url }}';
+    var form = document.getElementById('pookie-creator-form');
+    var fileInput = document.getElementById('pookie-images');
+    var dropzone = document.getElementById('pookie-dropzone');
+    var previews = document.getElementById('pookie-previews');
+    var submitBtn = document.getElementById('pookie-submit');
+    var progressDiv = document.getElementById('pookie-progress');
+    var progressFill = document.getElementById('pookie-progress-fill');
+    var progressText = document.getElementById('pookie-progress-text');
+    var successDiv = document.getElementById('pookie-success');
+    var errorDiv = document.getElementById('pookie-error');
+    var selectedFiles = [];
+
+    /* --- Drag & Drop --- */
+    dropzone.addEventListener('click', function() { fileInput.click(); });
+    dropzone.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      dropzone.classList.add('pookie-creator__dropzone--active');
+    });
+    dropzone.addEventListener('dragleave', function() {
+      dropzone.classList.remove('pookie-creator__dropzone--active');
+    });
+    dropzone.addEventListener('drop', function(e) {
+      e.preventDefault();
+      dropzone.classList.remove('pookie-creator__dropzone--active');
+      handleFiles(e.dataTransfer.files);
+    });
+    fileInput.addEventListener('change', function() {
+      handleFiles(fileInput.files);
+    });
+
+    function handleFiles(files) {
+      var newFiles = Array.from(files).slice(0, 3 - selectedFiles.length);
+      newFiles.forEach(function(file) {
+        if (selectedFiles.length >= 3) return;
+        if (file.size > 10 * 1024 * 1024) {
+          alert(file.name + ' is larger than 10 MB. Please use a smaller image.');
+          return;
+        }
+        selectedFiles.push(file);
+      });
+      renderPreviews();
+    }
+
+    function renderPreviews() {
+      previews.innerHTML = '';
+      selectedFiles.forEach(function(file, idx) {
+        var wrap = document.createElement('div');
+        wrap.className = 'pookie-creator__preview';
+        var img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+        img.alt = 'Preview ' + (idx + 1);
+        var removeBtn = document.createElement('button');
+        removeBtn.className = 'pookie-creator__preview-remove';
+        removeBtn.textContent = '×';
+        removeBtn.type = 'button';
+        removeBtn.addEventListener('click', function() {
+          selectedFiles.splice(idx, 1);
+          renderPreviews();
+        });
+        wrap.appendChild(img);
+        wrap.appendChild(removeBtn);
+        previews.appendChild(wrap);
+      });
+    }
+
+    /* --- Progress Animation --- */
+    var progressSteps = [
+      { pct: 10, text: 'Uploading images...' },
+      { pct: 25, text: 'Analyzing product with AI...' },
+      { pct: 40, text: 'Removing backgrounds...' },
+      { pct: 55, text: 'Generating styled background...' },
+      { pct: 70, text: 'Creating on-model shot...' },
+      { pct: 80, text: 'Writing description & tags...' },
+      { pct: 90, text: 'Creating product on Shopify...' },
+    ];
+
+    function animateProgress() {
+      var i = 0;
+      var interval = setInterval(function() {
+        if (i >= progressSteps.length) { clearInterval(interval); return; }
+        progressFill.style.width = progressSteps[i].pct + '%';
+        progressText.textContent = progressSteps[i].text;
+        i++;
+      }, 12000); /* ~12 sec per step ≈ 84 sec total for 7 steps */
+      return interval;
+    }
+
+    /* --- Form Submit --- */
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      if (selectedFiles.length === 0) {
+        alert('Please upload at least 1 product photo.');
+        return;
+      }
+
+      var checkedSizes = form.querySelectorAll('input[name="sizes"]:checked');
+      if (checkedSizes.length === 0) {
+        alert('Please select at least one size.');
+        return;
+      }
+
+      if (!BACKEND_URL) {
+        alert('Backend URL not configured. Please set it in the theme editor.');
+        return;
+      }
+
+      /* Collect sizes */
+      var sizes = [];
+      checkedSizes.forEach(function(cb) { sizes.push(cb.value); });
+
+      /* Build FormData */
+      var fd = new FormData();
+      selectedFiles.forEach(function(f) { fd.append('images', f); });
+      fd.append('price', form.querySelector('#pookie-price').value);
+      fd.append('compare_at_price', form.querySelector('#pookie-compare-price').value);
+      fd.append('sizes', sizes.join(','));
+      fd.append('name', form.querySelector('#pookie-name').value);
+      fd.append('description', form.querySelector('#pookie-description').value);
+      fd.append('category', form.querySelector('#pookie-category').value);
+
+      /* Show progress */
+      form.style.display = 'none';
+      successDiv.style.display = 'none';
+      errorDiv.style.display = 'none';
+      progressDiv.style.display = 'block';
+      progressFill.style.width = '5%';
+      progressText.textContent = 'Starting...';
+      var progressInterval = animateProgress();
+
+      /* Send to backend */
+      fetch(BACKEND_URL, {
+        method: 'POST',
+        body: fd,
+      })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        clearInterval(progressInterval);
+        progressDiv.style.display = 'none';
+
+        if (data.success) {
+          progressFill.style.width = '100%';
+          successDiv.style.display = 'block';
+          document.getElementById('pookie-success-name').textContent = data.product_name || 'Product';
+          document.getElementById('pookie-admin-link').href = data.admin_url || '#';
+          document.getElementById('pookie-store-link').href = data.product_url || '#';
+
+          var details = '';
+          if (data.images_uploaded) details += '📸 ' + data.images_uploaded + ' images uploaded<br>';
+          if (data.tags_count) details += '🏷️ ' + data.tags_count + ' tags generated<br>';
+          if (data.collections_assigned && data.collections_assigned.length)
+            details += '📁 Added to: ' + data.collections_assigned.join(', ') + '<br>';
+          if (data.ai_analysis) {
+            var ai = data.ai_analysis;
+            if (ai.garment_type) details += '👗 Type: ' + ai.garment_type + '<br>';
+            if (ai.color) details += '🎨 Color: ' + ai.color + '<br>';
+            if (ai.fabric) details += '🧵 Fabric: ' + ai.fabric + '<br>';
+          }
+          document.getElementById('pookie-success-details').innerHTML = details;
+        } else {
+          errorDiv.style.display = 'block';
+          document.getElementById('pookie-error-text').textContent = data.error || 'Unknown error occurred.';
+        }
+      })
+      .catch(function(err) {
+        clearInterval(progressInterval);
+        progressDiv.style.display = 'none';
+        errorDiv.style.display = 'block';
+        document.getElementById('pookie-error-text').textContent = 'Network error: ' + err.message;
+      });
+    });
+
+    /* --- Create Another --- */
+    document.getElementById('pookie-create-another').addEventListener('click', function() {
+      successDiv.style.display = 'none';
+      form.style.display = 'block';
+      form.reset();
+      selectedFiles = [];
+      previews.innerHTML = '';
+    });
+
+    /* --- Retry --- */
+    document.getElementById('pookie-retry').addEventListener('click', function() {
+      errorDiv.style.display = 'none';
+      form.style.display = 'block';
+    });
+  })();
+</script>
+
+{% schema %}
+{
+  "name": "Product Creator",
+  "tag": "section",
+  "class": "pookie-product-creator",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Create New Product"
+    },
+    {
+      "type": "text",
+      "id": "subheading",
+      "label": "Subheading",
+      "default": "Upload a photo and let AI do the rest. Product will be saved as Draft."
+    },
+    {
+      "type": "url",
+      "id": "backend_url",
+      "label": "Backend URL",
+      "info": "Google Cloud Function URL (e.g., https://asia-south1-pookie-style-automation.cloudfunctions.net/create-product)"
+    }
+  ],
+  "presets": [
+    {
+      "name": "Product Creator"
+    }
+  ]
+}
+{% endschema %}
