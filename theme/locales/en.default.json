@@ -1,0 +1,14 @@
+{
+  "sections": {
+    "pookie_hero": {
+      "aria_label": "Hero slideshow",
+      "previous": "Previous slide",
+      "next": "Next slide",
+      "go_to_slide": "Go to slide {{ number }}",
+      "slide_of": "Slide {{ current }} of {{ total }}"
+    },
+    "pookie_categories": {
+      "products": "products"
+    }
+  }
+}

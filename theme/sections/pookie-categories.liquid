@@ -1,0 +1,227 @@
+<section class="pookie-categories" data-section-id="{{ section.id }}">
+  <div class="pookie-categories__container">
+    {% if section.settings.heading != blank %}
+      <h2 class="pookie-categories__heading">{{ section.settings.heading }}</h2>
+    {% endif %}
+
+    {% if section.settings.subheading != blank %}
+      <p class="pookie-categories__subheading">{{ section.settings.subheading }}</p>
+    {% endif %}
+
+    <div
+      class="pookie-categories__grid"
+      style="
+        --desktop-cols: {{ section.settings.columns_desktop }};
+        --mobile-cols: {{ section.settings.columns_mobile }};
+      "
+    >
+      {% for block in section.blocks %}
+        {% render 'pookie-category-card',
+          collection: block.settings.collection,
+          custom_title: block.settings.custom_title,
+          custom_image: block.settings.custom_image
+        %}
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% stylesheet %}
+  .pookie-categories {
+    padding: 3rem 1.5rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .pookie-categories__heading {
+    font-size: clamp(1.5rem, 3vw, 2.2rem);
+    font-weight: 700;
+    text-align: center;
+    margin: 0 0 0.4rem;
+    letter-spacing: -0.02em;
+    color: #1a1a1a;
+  }
+
+  .pookie-categories__subheading {
+    font-size: 0.95rem;
+    text-align: center;
+    color: #666;
+    margin: 0 0 2rem;
+  }
+
+  .pookie-categories__grid {
+    display: grid;
+    grid-template-columns: repeat(var(--desktop-cols, 3), 1fr);
+    gap: 1rem;
+  }
+
+  .pookie-cat-card {
+    position: relative;
+    display: block;
+    aspect-ratio: 3 / 4;
+    border-radius: 12px;
+    overflow: hidden;
+    text-decoration: none;
+    color: #fff;
+  }
+
+  .pookie-cat-card__media {
+    position: absolute;
+    inset: 0;
+    transition: transform 0.5s ease;
+  }
+
+  .pookie-cat-card:hover .pookie-cat-card__media {
+    transform: scale(1.06);
+  }
+
+  .pookie-cat-card__img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .pookie-cat-card__placeholder {
+    width: 100%;
+    height: 100%;
+    background: #e8e0d8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pookie-cat-card__placeholder-svg {
+    width: 50%;
+    height: 50%;
+    opacity: 0.25;
+  }
+
+  .pookie-cat-card__overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(0deg, rgba(0, 0, 0, 0.55) 0%, rgba(0, 0, 0, 0) 60%);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .pookie-cat-card__info {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 2;
+    padding: 1.25rem;
+  }
+
+  .pookie-cat-card__title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin: 0 0 0.2rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .pookie-cat-card__count {
+    font-size: 0.75rem;
+    opacity: 0.8;
+  }
+
+  @media (max-width: 749px) {
+    .pookie-categories {
+      padding: 2rem 1rem;
+    }
+
+    .pookie-categories__grid {
+      grid-template-columns: repeat(var(--mobile-cols, 2), 1fr);
+      gap: 0.75rem;
+    }
+
+    .pookie-cat-card {
+      aspect-ratio: 3 / 4;
+      border-radius: 8px;
+    }
+
+    .pookie-cat-card__title {
+      font-size: 0.9rem;
+    }
+  }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "t:sections.pookie_categories.name",
+  "tag": "section",
+  "class": "pookie-categories-section",
+  "max_blocks": 8,
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "t:sections.pookie_categories.settings.heading",
+      "default": "Shop by category"
+    },
+    {
+      "type": "text",
+      "id": "subheading",
+      "label": "t:sections.pookie_categories.settings.subheading",
+      "default": "Find what suits your style"
+    },
+    {
+      "type": "range",
+      "id": "columns_desktop",
+      "label": "t:sections.pookie_categories.settings.columns_desktop",
+      "min": 2,
+      "max": 4,
+      "step": 1,
+      "default": 3
+    },
+    {
+      "type": "select",
+      "id": "columns_mobile",
+      "label": "t:sections.pookie_categories.settings.columns_mobile",
+      "options": [
+        { "value": "1", "label": "1" },
+        { "value": "2", "label": "2" }
+      ],
+      "default": "2"
+    }
+  ],
+  "blocks": [
+    {
+      "type": "category",
+      "name": "t:sections.pookie_categories.blocks.category",
+      "settings": [
+        {
+          "type": "collection",
+          "id": "collection",
+          "label": "t:sections.pookie_categories.settings.collection"
+        },
+        {
+          "type": "text",
+          "id": "custom_title",
+          "label": "t:sections.pookie_categories.settings.custom_title"
+        },
+        {
+          "type": "image_picker",
+          "id": "custom_image",
+          "label": "t:sections.pookie_categories.settings.custom_image"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:sections.pookie_categories.name",
+      "blocks": [
+        { "type": "category" },
+        { "type": "category" },
+        { "type": "category" },
+        { "type": "category" },
+        { "type": "category" },
+        { "type": "category" }
+      ]
+    }
+  ]
+}
+{% endschema %}

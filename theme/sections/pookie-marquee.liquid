@@ -1,0 +1,184 @@
+<section class="pookie-marquee" data-section-id="{{ section.id }}">
+  <div
+    class="pookie-marquee__track"
+    style="
+      --marquee-speed: {{ section.settings.speed }}s;
+      --marquee-bg: {{ section.settings.bg_color }};
+      --marquee-text: {{ section.settings.text_color }};
+    "
+    aria-hidden="true"
+  >
+    {% for block in section.blocks %}
+      {% assign total_blocks = section.blocks.size %}
+      {% if total_blocks > 0 %}
+        {% assign repeats = 12 | divided_by: total_blocks | at_least: 4 %}
+      {% else %}
+        {% assign repeats = 4 %}
+      {% endif %}
+    {% endfor %}
+
+    <div class="pookie-marquee__content">
+      {% for i in (1..repeats) %}
+        {% for block in section.blocks %}
+          <span class="pookie-marquee__item" {{ block.shopify_attributes }}>
+            {% if block.settings.icon != blank %}
+              <span class="pookie-marquee__icon">{{ block.settings.icon }}</span>
+            {% endif %}
+            {{ block.settings.text }}
+          </span>
+          <span class="pookie-marquee__separator" aria-hidden="true">✦</span>
+        {% endfor %}
+      {% endfor %}
+    </div>
+
+    <div class="pookie-marquee__content" aria-hidden="true">
+      {% for i in (1..repeats) %}
+        {% for block in section.blocks %}
+          <span class="pookie-marquee__item">
+            {% if block.settings.icon != blank %}
+              <span class="pookie-marquee__icon">{{ block.settings.icon }}</span>
+            {% endif %}
+            {{ block.settings.text }}
+          </span>
+          <span class="pookie-marquee__separator">✦</span>
+        {% endfor %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="visually-hidden">
+    {% for block in section.blocks %}
+      <span>{{ block.settings.text }}</span>
+    {% endfor %}
+  </div>
+</section>
+
+{% stylesheet %}
+  .pookie-marquee {
+    overflow: hidden;
+    background: var(--marquee-bg, #1a1a1a);
+    color: var(--marquee-text, #fff);
+    padding: 0.75rem 0;
+  }
+
+  .pookie-marquee__track {
+    display: flex;
+    width: max-content;
+    animation: pookieMarqueeScroll var(--marquee-speed, 30s) linear infinite;
+  }
+
+  .pookie-marquee__content {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .pookie-marquee__item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    padding: 0 0.5rem;
+  }
+
+  .pookie-marquee__icon {
+    font-size: 1rem;
+  }
+
+  .pookie-marquee__separator {
+    font-size: 0.5rem;
+    opacity: 0.5;
+    padding: 0 0.6rem;
+  }
+
+  @keyframes pookieMarqueeScroll {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+
+  .pookie-marquee__track:hover {
+    animation-play-state: paused;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .pookie-marquee__track {
+      animation: none;
+      justify-content: center;
+      width: 100%;
+    }
+    .pookie-marquee__content:nth-child(2) {
+      display: none;
+    }
+  }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "t:sections.pookie_marquee.name",
+  "tag": "section",
+  "class": "pookie-marquee-section",
+  "max_blocks": 8,
+  "settings": [
+    {
+      "type": "range",
+      "id": "speed",
+      "label": "t:sections.pookie_marquee.settings.speed",
+      "min": 10,
+      "max": 60,
+      "step": 5,
+      "unit": "s",
+      "default": 25
+    },
+    {
+      "type": "color",
+      "id": "bg_color",
+      "label": "t:sections.pookie_marquee.settings.bg_color",
+      "default": "#1a1a1a"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "t:sections.pookie_marquee.settings.text_color",
+      "default": "#ffffff"
+    }
+  ],
+  "blocks": [
+    {
+      "type": "message",
+      "name": "t:sections.pookie_marquee.blocks.message",
+      "settings": [
+        {
+          "type": "text",
+          "id": "text",
+          "label": "t:sections.pookie_marquee.settings.text",
+          "default": "Free shipping on ₹999+"
+        },
+        {
+          "type": "text",
+          "id": "icon",
+          "label": "t:sections.pookie_marquee.settings.icon"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:sections.pookie_marquee.name",
+      "blocks": [
+        { "type": "message", "settings": { "text": "Free shipping on ₹999+", "icon": "🚚" } },
+        { "type": "message", "settings": { "text": "New arrivals daily", "icon": "✨" } },
+        { "type": "message", "settings": { "text": "100% quality guaranteed", "icon": "💎" } },
+        { "type": "message", "settings": { "text": "Easy returns", "icon": "↩️" } }
+      ]
+    }
+  ]
+}
+{% endschema %}

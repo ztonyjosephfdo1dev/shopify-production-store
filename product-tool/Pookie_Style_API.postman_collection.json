@@ -1,0 +1,391 @@
+{
+  "info": {
+    "name": "Pookie Style — AI Product Creator v2",
+    "description": "Test collection for the Pookie Style AI Product Creation backend.\n\nEndpoint: https://asia-south1-pookie-style-automation.cloudfunctions.net/create-product\n\nTotal API calls per product: 3 (1 OpenAI + 2 Replicate)\nTotal images uploaded to Shopify: 2 (hero + collage)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "backend_url",
+      "value": "https://asia-south1-pookie-style-automation.cloudfunctions.net/create-product",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "item": [
+        {
+          "name": "1. Health Check — Empty POST (should return 400)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{backend_url}}",
+              "host": ["{{backend_url}}"]
+            },
+            "description": "Quick health check. Sends empty POST — backend should respond with:\n{\n  \"error\": \"No images uploaded. At least 1 image is required.\"\n}\n\nHTTP 400 = Backend is ALIVE and validating correctly."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Backend is alive (returns 400 for empty request)', function() {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Returns correct validation error', function() {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.error).to.include('No images uploaded');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. CORS Preflight — OPTIONS (should return 204)",
+          "request": {
+            "method": "OPTIONS",
+            "header": [
+              { "key": "Origin", "value": "https://pookiestyle.in" },
+              { "key": "Access-Control-Request-Method", "value": "POST" },
+              { "key": "Access-Control-Request-Headers", "value": "Content-Type" }
+            ],
+            "url": {
+              "raw": "{{backend_url}}",
+              "host": ["{{backend_url}}"]
+            },
+            "description": "Tests CORS preflight. Should return 204 with:\n- Access-Control-Allow-Origin: *\n- Access-Control-Allow-Methods: POST, OPTIONS"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('CORS preflight returns 204', function() {",
+                  "    pm.response.to.have.status(204);",
+                  "});",
+                  "",
+                  "pm.test('CORS headers present', function() {",
+                  "    pm.response.to.have.header('Access-Control-Allow-Origin');",
+                  "    pm.response.to.have.header('Access-Control-Allow-Methods');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Validation Tests",
+      "item": [
+        {
+          "name": "3. Missing Price (should return 400)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "description": "⬆️ SELECT A GARMENT IMAGE FILE HERE"
+                },
+                { "key": "sizes", "value": "M,L", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{backend_url}}",
+              "host": ["{{backend_url}}"]
+            },
+            "description": "Tests validation: price and compare_at_price are required.\nShould return 400 with error message."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 400 for missing price', function() {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Error mentions price', function() {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.error).to.include('Price');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. Missing Sizes (should return 400)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "description": "⬆️ SELECT A GARMENT IMAGE FILE HERE"
+                },
+                { "key": "price", "value": "599", "type": "text" },
+                { "key": "compare_at_price", "value": "999", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{backend_url}}",
+              "host": ["{{backend_url}}"]
+            },
+            "description": "Tests validation: sizes field is required.\nShould return 400 with error message."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 400 for missing sizes', function() {",
+                  "    pm.response.to.have.status(400);",
+                  "});",
+                  "",
+                  "pm.test('Error mentions size', function() {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.error).to.include('size');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Product Creation",
+      "item": [
+        {
+          "name": "5. ⭐ Create Product — Minimal (AI generates everything)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "description": "⬆️ SELECT A GARMENT IMAGE FILE HERE (JPG/PNG, max 10MB)"
+                },
+                { "key": "price", "value": "599", "type": "text", "description": "Selling price in ₹" },
+                { "key": "compare_at_price", "value": "999", "type": "text", "description": "Original/compare price in ₹" },
+                { "key": "sizes", "value": "M,L,XL", "type": "text", "description": "Comma-separated sizes" }
+              ]
+            },
+            "url": {
+              "raw": "{{backend_url}}",
+              "host": ["{{backend_url}}"]
+            },
+            "description": "MINIMAL product creation — only required fields.\nAI will auto-generate: product name, description, tags, SEO, category.\n\n⏱️ Takes ~60-90 seconds (3 API calls).\n\n✅ Expected: Product created as DRAFT in Shopify."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 200 success', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Product created successfully', function() {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.product_name).to.be.a('string');",
+                  "    pm.expect(json.product_url).to.include('pookiestyle.in');",
+                  "    pm.expect(json.admin_url).to.include('myshopify.com');",
+                  "});",
+                  "",
+                  "pm.test('Images uploaded', function() {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.images_uploaded).to.be.at.least(1);",
+                  "});",
+                  "",
+                  "pm.test('Tags generated (35-50)', function() {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.tags_count).to.be.at.least(35);",
+                  "});",
+                  "",
+                  "pm.test('Dress style detected', function() {",
+                  "    var json = pm.response.json();",
+                  "    var validStyles = ['traditional', 'western', 'fusion', 'formal'];",
+                  "    pm.expect(validStyles).to.include(json.dress_style);",
+                  "});",
+                  "",
+                  "// Save product URL for later",
+                  "if (pm.response.code === 200) {",
+                  "    var json = pm.response.json();",
+                  "    pm.collectionVariables.set('last_product_url', json.product_url);",
+                  "    pm.collectionVariables.set('last_admin_url', json.admin_url);",
+                  "    console.log('Product created: ' + json.product_name);",
+                  "    console.log('Admin URL: ' + json.admin_url);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "6. ⭐ Create Product — Full (all fields)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "description": "⬆️ SELECT A GARMENT IMAGE FILE HERE (JPG/PNG, max 10MB)"
+                },
+                { "key": "price", "value": "799", "type": "text" },
+                { "key": "compare_at_price", "value": "1499", "type": "text" },
+                { "key": "sizes", "value": "S,M,L,XL,XXL", "type": "text" },
+                { "key": "name", "value": "Emerald Green Embroidered A-Line Kurti", "type": "text", "description": "Custom product name (overrides AI)" },
+                { "key": "description", "value": "Pure cotton fabric, lightweight and breathable. Perfect for daily and office wear.", "type": "text", "description": "Notes for AI to include in description" },
+                { "key": "category", "value": "kurti", "type": "text", "description": "Shopify collection handle" },
+                { "key": "extra_prompt", "value": "Show with traditional Indian poses, warm festive background", "type": "text", "description": "Custom styling instruction for image generation" }
+              ]
+            },
+            "url": {
+              "raw": "{{backend_url}}",
+              "host": ["{{backend_url}}"]
+            },
+            "description": "FULL product creation — all fields including optional ones.\n\nFields:\n- images: garment photo (required)\n- price: selling price (required)\n- compare_at_price: original price (required)\n- sizes: comma-separated (required)\n- name: custom product name (optional)\n- description: notes for AI (optional)\n- category: collection handle (optional)\n- extra_prompt: custom styling (optional, NEW in v2)\n\n⏱️ Takes ~60-90 seconds.\n\n✅ Expected: Product created as DRAFT with custom name."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Returns 200 success', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Product created with custom name', function() {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.product_name).to.equal('Emerald Green Embroidered A-Line Kurti');",
+                  "});",
+                  "",
+                  "pm.test('Collection assigned', function() {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.collections_assigned).to.include('kurti');",
+                  "});",
+                  "",
+                  "pm.test('AI analysis returned', function() {",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.ai_analysis).to.be.an('object');",
+                  "    pm.expect(json.ai_analysis.garment_type).to.be.a('string');",
+                  "    pm.expect(json.ai_analysis.dress_style).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "7. ⭐ Create Product — Western Dress",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "",
+                  "description": "⬆️ SELECT A WESTERN DRESS IMAGE"
+                },
+                { "key": "price", "value": "499", "type": "text" },
+                { "key": "compare_at_price", "value": "899", "type": "text" },
+                { "key": "sizes", "value": "S,M,L", "type": "text" },
+                { "key": "category", "value": "single-piece", "type": "text" },
+                { "key": "extra_prompt", "value": "Casual urban street vibe, modern confident poses", "type": "text" }
+              ]
+            },
+            "url": {
+              "raw": "{{backend_url}}",
+              "host": ["{{backend_url}}"]
+            },
+            "description": "Test with a western dress to verify:\n- dress_style should be 'western'\n- Background should be urban/minimal\n- Poses should be casual/confident"
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Product created', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "});",
+                  "",
+                  "pm.test('Dress style detected', function() {",
+                  "    var json = pm.response.json();",
+                  "    console.log('Detected dress_style: ' + json.dress_style);",
+                  "    console.log('AI analysis: ' + JSON.stringify(json.ai_analysis));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Available Categories",
+      "item": [
+        {
+          "name": "📋 Category Reference (no request needed)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "https://pookiestyle.in",
+              "host": ["https://pookiestyle.in"]
+            },
+            "description": "This is NOT a real test — just a reference for available category values.\n\nETHNIC WEAR:\n  kurti, kurti-set, kurthi-set, suits, indo-western\n\nWESTERN WEAR:\n  tops, top, casual-top, korean-top, shirt, blouse, bodycon, fancy-crop-top, top-wear\n\nDRESSES & GOWNS:\n  single-piece, gown, gown-1, maxi, casual-maxi\n\nSETS & BOTTOMS:\n  cord-set, bottom, bottom-1, plazo, skirt\n\nINNERWEAR:\n  inners, panties\n\nBEAUTY & CARE:\n  skin-care, face-wash, body-lotion, hair-mask, face-mask, foot-mask, bb-cream, eye-lashes, fix-spray, powder, sun-screen, hand-cream, mascara, washing-soap\n\nSIZES:\n  S, M, L, XL, XXL, Free Size\n\nDRESS STYLES (auto-detected by AI):\n  traditional, western, fusion, formal"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

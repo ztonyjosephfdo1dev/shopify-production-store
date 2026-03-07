@@ -1,7 +1,15 @@
-# Environment variables
+# Environment variables & secrets
 .env
 .env.local
 .env.*.local
+.env.yaml
+product-tool/.env.yaml
+gcloud_*.txt
+CREDENTIALS_INVENTORY.csv
+
+# Deploy logs
+product-tool/deploy_err.txt
+product-tool/deploy_log.txt
 
 # Shopify CLI
 .shopifyrc

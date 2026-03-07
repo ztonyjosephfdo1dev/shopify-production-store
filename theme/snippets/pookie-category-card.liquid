@@ -1,0 +1,84 @@
+{% doc %}
+  Renders a single category card with image, hover zoom, and title overlay.
+  Uses branded SVG category images mapped by collection handle with
+  fallback chain: custom_image → collection.image → product image → branded SVG → placeholder.
+
+  @param {collection} collection - The collection object to render
+  @param {string} [custom_title] - Optional override title
+  @param {image} [custom_image] - Optional override image
+
+  @example
+  {% render 'pookie-category-card', collection: collections['tops'], custom_title: 'Western wear' %}
+{% enddoc %}
+
+{% liquid
+  if custom_title != blank
+    assign card_title = custom_title
+  elsif collection != blank
+    assign card_title = collection.title
+  else
+    assign card_title = 'Collection'
+  endif
+
+  comment
+    Map collection handles to branded SVG category images.
+    Handles within each category share the same card image.
+  endcomment
+  assign cat_svg = ''
+  if collection != blank
+    assign h = collection.handle
+    if h == 'kurti' or h == 'kurti-set' or h == 'kurthi-set' or h == 'suits' or h == 'indo-western'
+      assign cat_svg = 'pookie-cat-ethnic-wear.svg'
+    elsif h == 'tops' or h == 'top' or h == 'casual-top' or h == 'korean-top' or h == 'shirt' or h == 'blouse' or h == 'bodycon' or h == 'fancy-crop-top' or h == 'top-wear'
+      assign cat_svg = 'pookie-cat-western-wear.svg'
+    elsif h == 'single-piece' or h == 'gown' or h == 'gown-1' or h == 'maxi' or h == 'casual-maxi'
+      assign cat_svg = 'pookie-cat-dresses.svg'
+    elsif h == 'cord-set'
+      assign cat_svg = 'pookie-cat-cord-sets.svg'
+    elsif h == 'inners' or h == 'panties'
+      assign cat_svg = 'pookie-cat-innerwear.svg'
+    elsif h == 'skin-care' or h == 'face-mask' or h == 'foot-mask' or h == 'bb-cream' or h == 'eye-lashes' or h == 'body-lotion' or h == 'fix-spray' or h == 'hair-mask' or h == 'face-wash' or h == 'powder' or h == 'sun-screen' or h == 'hand-cream' or h == 'mascara' or h == 'washing-soap'
+      assign cat_svg = 'pookie-cat-beauty-care.svg'
+    elsif h == 'bottom' or h == 'bottom-1' or h == 'plazo' or h == 'skirt'
+      assign cat_svg = 'pookie-cat-bottoms.svg'
+    endif
+  endif
+%}
+
+<a
+  href="{% if collection != blank %}{{ collection.url }}{% else %}#{% endif %}"
+  class="pookie-cat-card"
+  {% if collection != blank %}aria-label="{{ card_title }}"{% endif %}
+>
+  <div class="pookie-cat-card__media">
+    {% if custom_image %}
+      {{ custom_image | image_url: width: 800, height: 800, crop: 'center' | image_tag: class: 'pookie-cat-card__img', loading: 'lazy', alt: card_title }}
+    {% elsif collection != blank and collection.image %}
+      {{ collection.image | image_url: width: 800, height: 800, crop: 'center' | image_tag: class: 'pookie-cat-card__img', loading: 'lazy', alt: card_title }}
+    {% elsif cat_svg != blank %}
+      <img
+        src="{{ cat_svg | asset_url }}"
+        alt="{{ card_title }}"
+        class="pookie-cat-card__img pookie-cat-card__img--svg"
+        loading="lazy"
+        width="600"
+        height="800"
+      />
+    {% elsif collection != blank and collection.products.first and collection.products.first.featured_image %}
+      {{ collection.products.first.featured_image | image_url: width: 800, height: 800, crop: 'center' | image_tag: class: 'pookie-cat-card__img', loading: 'lazy', alt: card_title }}
+    {% else %}
+      <div class="pookie-cat-card__placeholder">
+        {{ 'collection-1' | placeholder_svg_tag: 'pookie-cat-card__placeholder-svg' }}
+      </div>
+    {% endif %}
+  </div>
+  <div class="pookie-cat-card__overlay"></div>
+  <div class="pookie-cat-card__info">
+    <h3 class="pookie-cat-card__title">{{ card_title }}</h3>
+    {% if collection != blank and collection.products_count > 0 %}
+      <span class="pookie-cat-card__count">
+        {{ collection.products_count }} {{ 'sections.pookie_categories.products' | t }}
+      </span>
+    {% endif %}
+  </div>
+</a>

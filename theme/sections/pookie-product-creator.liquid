@@ -121,6 +121,12 @@
         </select>
       </div>
 
+      {%- comment -%} Extra Styling Prompt {%- endcomment -%}
+      <div class="pookie-creator__field">
+        <label class="pookie-creator__label" for="pookie-extra-prompt">Styling / Pose Instructions <span class="pookie-creator__optional">(optional — guide the AI for image generation)</span></label>
+        <textarea id="pookie-extra-prompt" name="extra_prompt" class="pookie-creator__textarea" rows="2" placeholder="e.g., Show with traditional Indian poses, add floral accessories, evening party vibe..."></textarea>
+      </div>
+
       {%- comment -%} Submit {%- endcomment -%}
       <button type="submit" id="pookie-submit" class="pookie-creator__submit">
         <span class="pookie-creator__submit-text">🚀 Create Product</span>
@@ -163,7 +169,7 @@
   (function() {
     'use strict';
 
-    var BACKEND_URL = '{{ section.settings.backend_url }}';
+    var BACKEND_URL = '{{ section.settings.backend_url }}' || 'https://asia-south1-pookie-style-automation.cloudfunctions.net/create-product';
     var form = document.getElementById('pookie-creator-form');
     var fileInput = document.getElementById('pookie-images');
     var dropzone = document.getElementById('pookie-dropzone');
@@ -233,11 +239,10 @@
     var progressSteps = [
       { pct: 10, text: 'Uploading images...' },
       { pct: 25, text: 'Analyzing product with AI...' },
-      { pct: 40, text: 'Removing backgrounds...' },
-      { pct: 55, text: 'Generating styled background...' },
-      { pct: 70, text: 'Creating on-model shot...' },
-      { pct: 80, text: 'Writing description & tags...' },
-      { pct: 90, text: 'Creating product on Shopify...' },
+      { pct: 45, text: 'Generating hero image (front view)...' },
+      { pct: 65, text: 'Creating 6-pose collage grid...' },
+      { pct: 80, text: 'Uploading images to Shopify...' },
+      { pct: 90, text: 'Creating product & assigning tags...' },
     ];
 
     function animateProgress() {
@@ -247,7 +252,7 @@
         progressFill.style.width = progressSteps[i].pct + '%';
         progressText.textContent = progressSteps[i].text;
         i++;
-      }, 12000); /* ~12 sec per step ≈ 84 sec total for 7 steps */
+      }, 14000); /* ~14 sec per step ≈ 84 sec total for 6 steps */
       return interval;
     }
 
@@ -284,6 +289,7 @@
       fd.append('name', form.querySelector('#pookie-name').value);
       fd.append('description', form.querySelector('#pookie-description').value);
       fd.append('category', form.querySelector('#pookie-category').value);
+      fd.append('extra_prompt', form.querySelector('#pookie-extra-prompt').value);
 
       /* Show progress */
       form.style.display = 'none';
@@ -321,6 +327,7 @@
             if (ai.garment_type) details += '👗 Type: ' + ai.garment_type + '<br>';
             if (ai.color) details += '🎨 Color: ' + ai.color + '<br>';
             if (ai.fabric) details += '🧵 Fabric: ' + ai.fabric + '<br>';
+            if (ai.dress_style) details += '👠 Style: ' + ai.dress_style + '<br>';
           }
           document.getElementById('pookie-success-details').innerHTML = details;
         } else {

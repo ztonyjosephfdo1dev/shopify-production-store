@@ -1,0 +1,90 @@
+{
+  "sections": {
+    "pookie_hero": {
+      "name": "Pookie hero slideshow",
+      "blocks": {
+        "slide": "Slide"
+      },
+      "settings": {
+        "auto_rotate": "Auto-rotate slides",
+        "speed": "Change slides every",
+        "image": "Image",
+        "subheading": "Subheading",
+        "heading": "Heading",
+        "cta_text": "Button label",
+        "cta_link": "Button link",
+        "cta_style": "Button style",
+        "position": "Content position",
+        "overlay": "Image overlay opacity"
+      },
+      "options": {
+        "solid": "Solid",
+        "outline": "Outline",
+        "center": "Center",
+        "left": "Left",
+        "right": "Right",
+        "bottom_left": "Bottom left"
+      }
+    },
+    "pookie_categories": {
+      "name": "Pookie category grid",
+      "blocks": {
+        "category": "Category"
+      },
+      "settings": {
+        "heading": "Heading",
+        "subheading": "Subheading",
+        "columns_desktop": "Desktop columns",
+        "columns_mobile": "Mobile columns",
+        "collection": "Collection",
+        "custom_title": "Custom title",
+        "custom_image": "Custom image"
+      }
+    },
+    "pookie_marquee": {
+      "name": "Pookie promo marquee",
+      "blocks": {
+        "message": "Message"
+      },
+      "settings": {
+        "speed": "Scroll speed",
+        "bg_color": "Background color",
+        "text_color": "Text color",
+        "text": "Text",
+        "icon": "Icon (emoji)"
+      }
+    },
+    "pookie_story": {
+      "name": "Pookie brand story",
+      "blocks": {
+        "tagline": "Tagline",
+        "heading": "Heading",
+        "text": "Text",
+        "button": "Button",
+        "features": "Feature highlights"
+      },
+      "settings": {
+        "image": "Image",
+        "layout": "Image position",
+        "tagline_text": "Tagline text",
+        "heading": "Heading",
+        "text": "Description",
+        "button_label": "Button label",
+        "button_link": "Button link",
+        "button_style": "Button style",
+        "icon_1": "Icon 1",
+        "feature_1": "Feature 1",
+        "icon_2": "Icon 2",
+        "feature_2": "Feature 2",
+        "icon_3": "Icon 3",
+        "feature_3": "Feature 3"
+      },
+      "options": {
+        "image_first": "Image first",
+        "text_first": "Text first",
+        "solid": "Solid",
+        "outline": "Outline"
+      }
+    }
+  }
+}

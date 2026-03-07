@@ -3,7 +3,7 @@
     "shopify-dev-mcp": {
       "type": "stdio",
       "command": "cmd",
-      "args": ["/k", "npx", "-y", "@shopify/dev-mcp@latest"],
+      "args": ["/c", "npx", "-y", "@shopify/dev-mcp@latest"],
       "env": {
         "LIQUID_VALIDATION_MODE": "full",
         "OPT_OUT_INSTRUMENTATION": "false",
@@ -13,6 +13,11 @@
     "shopify-storefront-mcp": {
       "type": "http",
       "url": "https://udfphb-uk.myshopify.com/api/mcp"
+    },
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "gallery": true
     }
   }
 }

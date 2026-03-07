@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800" width="600" height="800">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#EC4899;stop-opacity:1"/>
+      <stop offset="50%" style="stop-color:#F472B6;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#FB923C;stop-opacity:1"/>
+    </linearGradient>
+    <linearGradient id="overlay" x1="0%" y1="60%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#000;stop-opacity:0"/>
+      <stop offset="100%" style="stop-color:#000;stop-opacity:0.55"/>
+    </linearGradient>
+    <pattern id="stripes" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <line x1="0" y1="0" x2="0" y2="20" stroke="rgba(255,255,255,0.06)" stroke-width="8"/>
+    </pattern>
+  </defs>
+  <rect width="600" height="800" fill="url(#bg)"/>
+  <rect width="600" height="800" fill="url(#stripes)"/>
+  <!-- Modern geometric accent -->
+  <g opacity="0.1" fill="none" stroke="white" stroke-width="1.5">
+    <rect x="60" y="80" width="120" height="120" rx="8" transform="rotate(15,120,140)"/>
+    <rect x="420" y="120" width="100" height="100" rx="8" transform="rotate(-10,470,170)"/>
+    <polygon points="300,60 340,130 260,130"/>
+    <polygon points="300,80 325,120 275,120"/>
+  </g>
+  <!-- T-shirt/Top silhouette -->
+  <g transform="translate(300,370)" opacity="0.15" fill="white">
+    <!-- Head -->
+    <circle cx="0" cy="-130" r="28"/>
+    <!-- Neck -->
+    <rect x="-8" y="-102" width="16" height="15" rx="3"/>
+    <!-- Crop top body -->
+    <path d="M-55,-87 C-58,-87 -62,-82 -68,-70 L-72,-50 L-75,10 L-70,80 L-25,85 L0,85 L25,85 L70,80 L75,10 L72,-50 L68,-70 C62,-82 58,-87 55,-87 L35,-87 C25,-82 12,-78 0,-78 C-12,-78 -25,-82 -35,-87Z"/>
+    <!-- Short sleeves -->
+    <path d="M-55,-87 L-95,-55 L-88,-35 L-62,-60Z"/>
+    <path d="M55,-87 L95,-55 L88,-35 L62,-60Z"/>
+    <!-- Jeans/pants -->
+    <path d="M-50,85 L-55,180 L-25,180 L-15,120 L0,120 L15,120 L25,180 L55,180 L50,85Z" opacity="0.6"/>
+  </g>
+  <!-- Floating fashion elements -->
+  <g opacity="0.08" fill="white">
+    <circle cx="480" cy="500" r="40"/>
+    <circle cx="120" cy="550" r="30"/>
+    <circle cx="500" cy="600" r="20"/>
+  </g>
+  <rect width="600" height="800" fill="url(#overlay)"/>
+  <text x="300" y="720" font-family="'Georgia','Times New Roman',serif" font-size="42" font-weight="bold" fill="white" text-anchor="middle" letter-spacing="3">WESTERN WEAR</text>
+  <text x="300" y="755" font-family="'Helvetica Neue','Arial',sans-serif" font-size="16" fill="rgba(255,255,255,0.7)" text-anchor="middle" letter-spacing="5">EXPLORE COLLECTION</text>
+  <line x1="200" y1="690" x2="400" y2="690" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+</svg>

@@ -1,0 +1,347 @@
+{
+  "sections": {
+    "pookie-hero": {
+      "type": "pookie-hero",
+      "blocks": {
+        "slide-1": {
+          "type": "slide",
+          "settings": {
+            "subheading": "New arrivals",
+            "heading": "Spring collection 2026",
+            "cta_text": "Shop now",
+            "cta_link": "shopify://collections",
+            "cta_style": "solid",
+            "position": "center",
+            "overlay": 30
+          }
+        },
+        "slide-2": {
+          "type": "slide",
+          "settings": {
+            "subheading": "Handpicked styles",
+            "heading": "Ethnic elegance",
+            "cta_text": "Explore kurti",
+            "cta_link": "shopify://collections/kurti",
+            "cta_style": "solid",
+            "position": "left",
+            "overlay": 35
+          }
+        },
+        "slide-3": {
+          "type": "slide",
+          "settings": {
+            "subheading": "Trending now",
+            "heading": "Cord set collection",
+            "cta_text": "View all",
+            "cta_link": "shopify://collections/cord-set",
+            "cta_style": "outline",
+            "position": "center",
+            "overlay": 30
+          }
+        },
+        "slide-4": {
+          "type": "slide",
+          "settings": {
+            "subheading": "Limited time offer",
+            "heading": "Flat 20% off",
+            "cta_text": "Grab the deal",
+            "cta_link": "shopify://collections",
+            "cta_style": "solid",
+            "position": "center",
+            "overlay": 40
+          }
+        }
+      },
+      "block_order": ["slide-1", "slide-2", "slide-3", "slide-4"],
+      "settings": {
+        "auto_rotate": true,
+        "speed": 5
+      }
+    },
+
+    "pookie-marquee": {
+      "type": "pookie-marquee",
+      "blocks": {
+        "msg-1": {
+          "type": "message",
+          "settings": {
+            "text": "Free shipping on ₹999+",
+            "icon": "🚚"
+          }
+        },
+        "msg-2": {
+          "type": "message",
+          "settings": {
+            "text": "New arrivals daily",
+            "icon": "✨"
+          }
+        },
+        "msg-3": {
+          "type": "message",
+          "settings": {
+            "text": "100% quality guaranteed",
+            "icon": "💎"
+          }
+        },
+        "msg-4": {
+          "type": "message",
+          "settings": {
+            "text": "Easy returns & exchange",
+            "icon": "↩️"
+          }
+        },
+        "msg-5": {
+          "type": "message",
+          "settings": {
+            "text": "COD available",
+            "icon": "💰"
+          }
+        }
+      },
+      "block_order": ["msg-1", "msg-2", "msg-3", "msg-4", "msg-5"],
+      "settings": {
+        "speed": 25,
+        "bg_color": "#1a1a1a",
+        "text_color": "#ffffff"
+      }
+    },
+
+    "pookie-categories": {
+      "type": "pookie-categories",
+      "blocks": {
+        "cat-ethnic": {
+          "type": "category",
+          "settings": {
+            "collection": "kurti",
+            "custom_title": "Ethnic wear"
+          }
+        },
+        "cat-western": {
+          "type": "category",
+          "settings": {
+            "collection": "tops",
+            "custom_title": "Western wear"
+          }
+        },
+        "cat-dresses": {
+          "type": "category",
+          "settings": {
+            "collection": "single-piece",
+            "custom_title": "Dresses"
+          }
+        },
+        "cat-cordsets": {
+          "type": "category",
+          "settings": {
+            "collection": "cord-set",
+            "custom_title": "Cord sets"
+          }
+        },
+        "cat-innerwear": {
+          "type": "category",
+          "settings": {
+            "collection": "inners",
+            "custom_title": "Innerwear"
+          }
+        },
+        "cat-beauty": {
+          "type": "category",
+          "settings": {
+            "collection": "skin-care",
+            "custom_title": "Beauty & skincare"
+          }
+        }
+      },
+      "block_order": ["cat-ethnic", "cat-western", "cat-dresses", "cat-cordsets", "cat-innerwear", "cat-beauty"],
+      "settings": {
+        "heading": "Shop by category",
+        "subheading": "Find what suits your style",
+        "columns_desktop": 3,
+        "columns_mobile": "2"
+      }
+    },
+
+    "new-arrivals": {
+      "type": "featured-collection",
+      "settings": {
+        "heading_size": "h2",
+        "show_description": false,
+        "description_style": "body",
+        "collection": "frontpage",
+        "products_to_show": 10,
+        "columns_desktop": 5,
+        "full_width": false,
+        "show_view_all": true,
+        "view_all_style": "solid",
+        "enable_desktop_slider": true,
+        "color_scheme": "scheme-1",
+        "image_ratio": "portrait",
+        "image_shape": "default",
+        "show_secondary_image": true,
+        "show_vendor": false,
+        "show_rating": false,
+        "quick_add": "standard",
+        "columns_mobile": "2",
+        "swipe_on_mobile": true,
+        "padding_top": 36,
+        "padding_bottom": 36
+      }
+    },
+
+    "promo-banner": {
+      "type": "image-banner",
+      "blocks": {
+        "promo-heading": {
+          "type": "heading",
+          "settings": {
+            "heading": "Summer sale is here",
+            "heading_size": "h1"
+          }
+        },
+        "promo-text": {
+          "type": "text",
+          "settings": {
+            "text": "Get up to 30% off on ethnic wear and western wear collections",
+            "text_style": "body"
+          }
+        },
+        "promo-buttons": {
+          "type": "buttons",
+          "settings": {
+            "button_label_1": "Shop ethnic wear",
+            "button_link_1": "shopify://collections/kurti",
+            "button_style_secondary_1": false,
+            "button_label_2": "Shop western wear",
+            "button_link_2": "shopify://collections/tops",
+            "button_style_secondary_2": true
+          }
+        }
+      },
+      "block_order": ["promo-heading", "promo-text", "promo-buttons"],
+      "settings": {
+        "image_overlay_opacity": 40,
+        "image_height": "medium",
+        "desktop_content_position": "middle-center",
+        "show_text_box": true,
+        "desktop_content_alignment": "center",
+        "color_scheme": "scheme-1",
+        "image_behavior": "none",
+        "mobile_content_alignment": "center",
+        "stack_images_on_mobile": true,
+        "show_text_below": false
+      }
+    },
+
+    "best-sellers": {
+      "type": "featured-collection",
+      "settings": {
+        "heading_size": "h2",
+        "show_description": false,
+        "description_style": "body",
+        "collection": "tops",
+        "products_to_show": 10,
+        "columns_desktop": 5,
+        "full_width": false,
+        "show_view_all": true,
+        "view_all_style": "solid",
+        "enable_desktop_slider": true,
+        "color_scheme": "scheme-1",
+        "image_ratio": "portrait",
+        "image_shape": "default",
+        "show_secondary_image": true,
+        "show_vendor": false,
+        "show_rating": false,
+        "quick_add": "standard",
+        "columns_mobile": "2",
+        "swipe_on_mobile": true,
+        "padding_top": 36,
+        "padding_bottom": 36
+      }
+    },
+
+    "pookie-brand-story": {
+      "type": "pookie-brand-story",
+      "blocks": {
+        "story-tagline": {
+          "type": "tagline",
+          "settings": {
+            "text": "Our story"
+          }
+        },
+        "story-heading": {
+          "type": "heading",
+          "settings": {
+            "heading": "About Pookie Style"
+          }
+        },
+        "story-text": {
+          "type": "text",
+          "settings": {
+            "text": "<p>Your one-stop destination for trendy and affordable fashion. We bring you the latest styles in ethnic wear, western wear, dresses, and beauty products — all handpicked for the modern woman who values both style and comfort.</p>"
+          }
+        },
+        "story-features": {
+          "type": "features",
+          "settings": {
+            "icon_1": "🚚",
+            "feature_1": "Free shipping",
+            "icon_2": "↩️",
+            "feature_2": "Easy returns",
+            "icon_3": "💎",
+            "feature_3": "Premium quality"
+          }
+        },
+        "story-button": {
+          "type": "button",
+          "settings": {
+            "label": "Learn more",
+            "style": "solid"
+          }
+        }
+      },
+      "block_order": ["story-tagline", "story-heading", "story-text", "story-features", "story-button"],
+      "settings": {
+        "layout": "image-first"
+      }
+    },
+
+    "newsletter": {
+      "type": "newsletter",
+      "blocks": {
+        "nl-heading": {
+          "type": "heading",
+          "settings": {
+            "heading": "Join the Pookie fam"
+          }
+        },
+        "nl-paragraph": {
+          "type": "paragraph",
+          "settings": {
+            "text": "<p>Subscribe for exclusive drops, early access to sales, and styling tips delivered to your inbox.<\/p>"
+          }
+        },
+        "nl-email": {
+          "type": "email_form",
+          "settings": {}
+        }
+      },
+      "block_order": ["nl-heading", "nl-paragraph", "nl-email"],
+      "settings": {
+        "color_scheme": "scheme-2",
+        "full_width": true,
+        "padding_top": 52,
+        "padding_bottom": 52
+      }
+    }
+  },
+  "order": [
+    "pookie-hero",
+    "pookie-marquee",
+    "pookie-categories",
+    "new-arrivals",
+    "promo-banner",
+    "best-sellers",
+    "pookie-brand-story",
+    "newsletter"
+  ]
+}

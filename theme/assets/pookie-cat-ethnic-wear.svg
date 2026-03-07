@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800" width="600" height="800">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7C3AED;stop-opacity:1"/>
+      <stop offset="50%" style="stop-color:#A855F7;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#D4A574;stop-opacity:1"/>
+    </linearGradient>
+    <linearGradient id="overlay" x1="0%" y1="60%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#000;stop-opacity:0"/>
+      <stop offset="100%" style="stop-color:#000;stop-opacity:0.55"/>
+    </linearGradient>
+    <pattern id="dots" x="0" y="0" width="30" height="30" patternUnits="userSpaceOnUse">
+      <circle cx="15" cy="15" r="1.2" fill="rgba(255,255,255,0.08)"/>
+    </pattern>
+  </defs>
+  <!-- Background -->
+  <rect width="600" height="800" fill="url(#bg)"/>
+  <rect width="600" height="800" fill="url(#dots)"/>
+  <!-- Decorative paisley/ethnic motifs -->
+  <g opacity="0.12" fill="white">
+    <circle cx="100" cy="150" r="80" stroke="white" stroke-width="2" fill="none"/>
+    <circle cx="100" cy="150" r="60" stroke="white" stroke-width="1.5" fill="none"/>
+    <circle cx="100" cy="150" r="40" stroke="white" stroke-width="1" fill="none"/>
+    <circle cx="500" cy="250" r="90" stroke="white" stroke-width="2" fill="none"/>
+    <circle cx="500" cy="250" r="70" stroke="white" stroke-width="1.5" fill="none"/>
+    <circle cx="500" cy="250" r="50" stroke="white" stroke-width="1" fill="none"/>
+    <path d="M250,80 Q300,20 350,80 Q400,140 350,200 Q300,260 250,200 Q200,140 250,80Z" stroke="white" stroke-width="1.5" fill="none"/>
+    <path d="M280,100 Q300,60 320,100 Q340,140 320,180 Q300,220 280,180 Q260,140 280,100Z" stroke="white" stroke-width="1" fill="none"/>
+  </g>
+  <!-- Kurti/Dress silhouette -->
+  <g transform="translate(300,380)" opacity="0.15" fill="white">
+    <!-- Head -->
+    <circle cx="0" cy="-140" r="28"/>
+    <!-- Neck -->
+    <rect x="-8" y="-112" width="16" height="20" rx="4"/>
+    <!-- Kurti body -->
+    <path d="M-60,-92 C-65,-92 -70,-85 -75,-70 L-85,-20 L-90,60 L-80,180 L-30,180 L-25,60 L-20,0 L0,0 L20,0 L25,60 L30,180 L80,180 L90,60 L85,-20 L75,-70 C70,-85 65,-92 60,-92 L40,-92 C30,-85 15,-80 0,-80 C-15,-80 -30,-85 -40,-92Z"/>
+    <!-- Sleeves -->
+    <path d="M-60,-92 L-100,-40 L-95,-25 L-65,-65Z"/>
+    <path d="M60,-92 L100,-40 L95,-25 L65,-65Z"/>
+    <!-- Dupatta drape -->
+    <path d="M-40,-85 C-80,-60 -110,-20 -120,40 C-125,80 -115,120 -100,160 L-85,160 C-95,120 -100,80 -95,45 C-85,-10 -60,-50 -30,-75Z" opacity="0.7"/>
+  </g>
+  <!-- Mandala ring decorative -->
+  <g transform="translate(300,360)" opacity="0.06" fill="none" stroke="white" stroke-width="1">
+    <circle r="200"/><circle r="210"/><circle r="220"/>
+    <circle r="185"/><circle r="170"/>
+  </g>
+  <!-- Bottom gradient overlay -->
+  <rect width="600" height="800" fill="url(#overlay)"/>
+  <!-- Category text -->
+  <text x="300" y="720" font-family="'Georgia','Times New Roman',serif" font-size="42" font-weight="bold" fill="white" text-anchor="middle" letter-spacing="3">ETHNIC WEAR</text>
+  <text x="300" y="755" font-family="'Helvetica Neue','Arial',sans-serif" font-size="16" fill="rgba(255,255,255,0.7)" text-anchor="middle" letter-spacing="5" text-transform="uppercase">EXPLORE COLLECTION</text>
+  <!-- Top decorative line -->
+  <line x1="200" y1="690" x2="400" y2="690" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
+</svg>

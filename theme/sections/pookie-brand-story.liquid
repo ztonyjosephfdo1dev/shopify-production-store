@@ -1,0 +1,377 @@
+<section class="pookie-story" data-section-id="{{ section.id }}">
+  <div class="pookie-story__container pookie-story__container--{{ section.settings.layout }}">
+    <div class="pookie-story__media">
+      {% if section.settings.image %}
+        {{ section.settings.image | image_url: width: 1000 | image_tag: class: 'pookie-story__img', loading: 'lazy' }}
+      {% else %}
+        <div class="pookie-story__placeholder">
+          {{ 'lifestyle-2' | placeholder_svg_tag: 'pookie-story__placeholder-svg' }}
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="pookie-story__content">
+      {% for block in section.blocks %}
+        {% case block.type %}
+          {% when 'tagline' %}
+            <span class="pookie-story__tagline" {{ block.shopify_attributes }}>
+              {{ block.settings.text }}
+            </span>
+
+          {% when 'heading' %}
+            <h2 class="pookie-story__heading" {{ block.shopify_attributes }}>
+              {{ block.settings.heading }}
+            </h2>
+
+          {% when 'text' %}
+            <div class="pookie-story__text" {{ block.shopify_attributes }}>
+              {{ block.settings.text }}
+            </div>
+
+          {% when 'button' %}
+            <a
+              href="{{ block.settings.link }}"
+              class="pookie-story__cta {% if block.settings.style == 'outline' %}pookie-story__cta--outline{% endif %}"
+              {{ block.shopify_attributes }}
+            >
+              {{ block.settings.label }}
+            </a>
+
+          {% when 'features' %}
+            <div class="pookie-story__features" {{ block.shopify_attributes }}>
+              {% if block.settings.feature_1 != blank %}
+                <div class="pookie-story__feature">
+                  <span class="pookie-story__feature-icon">{{ block.settings.icon_1 }}</span>
+                  <span class="pookie-story__feature-text">{{ block.settings.feature_1 }}</span>
+                </div>
+              {% endif %}
+              {% if block.settings.feature_2 != blank %}
+                <div class="pookie-story__feature">
+                  <span class="pookie-story__feature-icon">{{ block.settings.icon_2 }}</span>
+                  <span class="pookie-story__feature-text">{{ block.settings.feature_2 }}</span>
+                </div>
+              {% endif %}
+              {% if block.settings.feature_3 != blank %}
+                <div class="pookie-story__feature">
+                  <span class="pookie-story__feature-icon">{{ block.settings.icon_3 }}</span>
+                  <span class="pookie-story__feature-text">{{ block.settings.feature_3 }}</span>
+                </div>
+              {% endif %}
+            </div>
+        {% endcase %}
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% stylesheet %}
+  .pookie-story {
+    padding: 4rem 1.5rem;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .pookie-story__container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    align-items: center;
+  }
+
+  .pookie-story__container--text-first {
+    direction: rtl;
+  }
+
+  .pookie-story__container--text-first > * {
+    direction: ltr;
+  }
+
+  .pookie-story__media {
+    position: relative;
+    border-radius: 16px;
+    overflow: hidden;
+    aspect-ratio: 4 / 5;
+  }
+
+  .pookie-story__img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .pookie-story__placeholder {
+    width: 100%;
+    height: 100%;
+    background: #f0ebe6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .pookie-story__placeholder-svg {
+    width: 50%;
+    height: 50%;
+    opacity: 0.2;
+  }
+
+  .pookie-story__content {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .pookie-story__tagline {
+    display: inline-block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #b08968;
+  }
+
+  .pookie-story__heading {
+    font-size: clamp(1.5rem, 3.5vw, 2.5rem);
+    font-weight: 700;
+    line-height: 1.2;
+    margin: 0;
+    color: #1a1a1a;
+    letter-spacing: -0.02em;
+  }
+
+  .pookie-story__text {
+    font-size: 1rem;
+    line-height: 1.7;
+    color: #555;
+    max-width: 480px;
+  }
+
+  .pookie-story__cta {
+    display: inline-block;
+    padding: 0.85rem 2.2rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-decoration: none;
+    color: #fff;
+    background: #1a1a1a;
+    border: 2px solid #1a1a1a;
+    border-radius: 0;
+    transition: all 0.3s ease;
+    align-self: flex-start;
+    margin-top: 0.5rem;
+  }
+
+  .pookie-story__cta:hover {
+    background: transparent;
+    color: #1a1a1a;
+  }
+
+  .pookie-story__cta--outline {
+    background: transparent;
+    color: #1a1a1a;
+  }
+
+  .pookie-story__cta--outline:hover {
+    background: #1a1a1a;
+    color: #fff;
+  }
+
+  .pookie-story__features {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    margin-top: 0.5rem;
+  }
+
+  .pookie-story__feature {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .pookie-story__feature-icon {
+    font-size: 1.2rem;
+  }
+
+  .pookie-story__feature-text {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: #444;
+  }
+
+  @media (max-width: 749px) {
+    .pookie-story {
+      padding: 2.5rem 1rem;
+    }
+
+    .pookie-story__container {
+      grid-template-columns: 1fr;
+      gap: 2rem;
+    }
+
+    .pookie-story__container--text-first {
+      direction: ltr;
+    }
+
+    .pookie-story__media {
+      aspect-ratio: 1 / 1;
+      border-radius: 12px;
+    }
+
+    .pookie-story__cta {
+      align-self: stretch;
+      text-align: center;
+    }
+  }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "t:sections.pookie_story.name",
+  "tag": "section",
+  "class": "pookie-story-section",
+  "settings": [
+    {
+      "type": "image_picker",
+      "id": "image",
+      "label": "t:sections.pookie_story.settings.image"
+    },
+    {
+      "type": "select",
+      "id": "layout",
+      "label": "t:sections.pookie_story.settings.layout",
+      "options": [
+        { "value": "image-first", "label": "t:sections.pookie_story.options.image_first" },
+        { "value": "text-first", "label": "t:sections.pookie_story.options.text_first" }
+      ],
+      "default": "image-first"
+    }
+  ],
+  "blocks": [
+    {
+      "type": "tagline",
+      "name": "t:sections.pookie_story.blocks.tagline",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "text",
+          "id": "text",
+          "label": "t:sections.pookie_story.settings.tagline_text",
+          "default": "Our story"
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "name": "t:sections.pookie_story.blocks.heading",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "text",
+          "id": "heading",
+          "label": "t:sections.pookie_story.settings.heading",
+          "default": "About Pookie Style"
+        }
+      ]
+    },
+    {
+      "type": "text",
+      "name": "t:sections.pookie_story.blocks.text",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "richtext",
+          "id": "text",
+          "label": "t:sections.pookie_story.settings.text",
+          "default": "<p>Your one-stop destination for trendy and affordable fashion. We bring you the latest styles in ethnic wear, western wear, dresses, and beauty products — all handpicked for the modern woman.</p>"
+        }
+      ]
+    },
+    {
+      "type": "button",
+      "name": "t:sections.pookie_story.blocks.button",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "text",
+          "id": "label",
+          "label": "t:sections.pookie_story.settings.button_label",
+          "default": "Learn more"
+        },
+        {
+          "type": "url",
+          "id": "link",
+          "label": "t:sections.pookie_story.settings.button_link"
+        },
+        {
+          "type": "select",
+          "id": "style",
+          "label": "t:sections.pookie_story.settings.button_style",
+          "options": [
+            { "value": "solid", "label": "t:sections.pookie_story.options.solid" },
+            { "value": "outline", "label": "t:sections.pookie_story.options.outline" }
+          ],
+          "default": "solid"
+        }
+      ]
+    },
+    {
+      "type": "features",
+      "name": "t:sections.pookie_story.blocks.features",
+      "limit": 1,
+      "settings": [
+        {
+          "type": "text",
+          "id": "icon_1",
+          "label": "t:sections.pookie_story.settings.icon_1",
+          "default": "🚚"
+        },
+        {
+          "type": "text",
+          "id": "feature_1",
+          "label": "t:sections.pookie_story.settings.feature_1",
+          "default": "Free shipping"
+        },
+        {
+          "type": "text",
+          "id": "icon_2",
+          "label": "t:sections.pookie_story.settings.icon_2",
+          "default": "↩️"
+        },
+        {
+          "type": "text",
+          "id": "feature_2",
+          "label": "t:sections.pookie_story.settings.feature_2",
+          "default": "Easy returns"
+        },
+        {
+          "type": "text",
+          "id": "icon_3",
+          "label": "t:sections.pookie_story.settings.icon_3",
+          "default": "💎"
+        },
+        {
+          "type": "text",
+          "id": "feature_3",
+          "label": "t:sections.pookie_story.settings.feature_3",
+          "default": "Premium quality"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "t:sections.pookie_story.name",
+      "blocks": [
+        { "type": "tagline", "settings": { "text": "Our story" } },
+        { "type": "heading", "settings": { "heading": "About Pookie Style" } },
+        { "type": "text", "settings": { "text": "<p>Your one-stop destination for trendy and affordable fashion. We bring you the latest styles in ethnic wear, western wear, dresses, and beauty products — all handpicked for the modern woman.</p>" } },
+        { "type": "features", "settings": { "icon_1": "🚚", "feature_1": "Free shipping", "icon_2": "↩️", "feature_2": "Easy returns", "icon_3": "💎", "feature_3": "Premium quality" } },
+        { "type": "button", "settings": { "label": "Learn more" } }
+      ]
+    }
+  ]
+}
+{% endschema %}
