@@ -183,7 +183,10 @@
     var selectedFiles = [];
 
     /* --- Drag & Drop --- */
-    dropzone.addEventListener('click', function() { fileInput.click(); });
+    dropzone.addEventListener('click', function(e) {
+      if (e.target === fileInput) return;
+      fileInput.click();
+    });
     dropzone.addEventListener('dragover', function(e) {
       e.preventDefault();
       dropzone.classList.add('pookie-creator__dropzone--active');
