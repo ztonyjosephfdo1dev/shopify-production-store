@@ -12,19 +12,19 @@ import io
 from PIL import Image
 
 
-def crop_grid_2x2(grid_image_bytes: bytes) -> list[bytes]:
+def crop_grid_to_halves(grid_image_bytes: bytes) -> list[bytes]:
     """
-    Split a 2×2 grid image into 4 individual square images.
+    Split a 2×2 grid into 2 horizontal halves (top row + bottom row).
 
     Layout:
-      [ TL ] [ TR ]
-      [ BL ] [ BR ]
+      Top half:    [ Pose 1 ] [ Pose 2 ]
+      Bottom half: [ Pose 3 ] [ Pose 4 ]
 
     Args:
         grid_image_bytes: bytes of the 2×2 grid image
 
     Returns:
-        list of 4 JPEG image bytes, one per quadrant
+        list of 2 JPEG image bytes — [top_half, bottom_half]
     """
     try:
         img = Image.open(io.BytesIO(grid_image_bytes))
@@ -32,29 +32,83 @@ def crop_grid_2x2(grid_image_bytes: bytes) -> list[bytes]:
             img = img.convert("RGB")
 
         w, h = img.size
-        mid_x = w // 2
         mid_y = h // 2
 
-        boxes = [
-            (0, 0, mid_x, mid_y),          # Top-left
-            (mid_x, 0, w, mid_y),           # Top-right
-            (0, mid_y, mid_x, h),           # Bottom-left
-            (mid_x, mid_y, w, h),           # Bottom-right
+        halves = [
+            img.crop((0, 0, w, mid_y)),     # Top row
+            img.crop((0, mid_y, w, h)),      # Bottom row
         ]
 
         results = []
-        for i, box in enumerate(boxes):
-            crop = img.crop(box)
+        for i, half in enumerate(halves):
             buf = io.BytesIO()
-            crop.save(buf, format="JPEG", quality=92)
+            half.save(buf, format="JPEG", quality=95)
             results.append(buf.getvalue())
-            print(f"[crop_2x2] Panel {i+1}: {crop.size[0]}×{crop.size[1]}px")
+            print(f"[crop_halves] Half {i+1}: {half.size[0]}×{half.size[1]}px")
 
         return results
 
     except Exception as e:
-        print(f"[crop_2x2] Error: {e}")
+        print(f"[crop_halves] Error: {e}")
         return []
+
+
+def crop_half_to_two(half_image_bytes: bytes) -> list[bytes]:
+    """
+    Split a horizontal half (2 side-by-side poses) into 2 individual images.
+
+    Layout:
+      [ Left Pose ] [ Right Pose ]
+
+    Args:
+        half_image_bytes: bytes of one half (containing 2 poses side by side)
+
+    Returns:
+        list of 2 JPEG image bytes — [left_pose, right_pose]
+    """
+    try:
+        img = Image.open(io.BytesIO(half_image_bytes))
+        if img.mode != "RGB":
+            img = img.convert("RGB")
+
+        w, h = img.size
+        mid_x = w // 2
+
+        poses = [
+            img.crop((0, 0, mid_x, h)),     # Left pose
+            img.crop((mid_x, 0, w, h)),      # Right pose
+        ]
+
+        results = []
+        for i, pose in enumerate(poses):
+            buf = io.BytesIO()
+            pose.save(buf, format="JPEG", quality=92)
+            results.append(buf.getvalue())
+            print(f"[crop_half] Pose {i+1}: {pose.size[0]}×{pose.size[1]}px")
+
+        return results
+
+    except Exception as e:
+        print(f"[crop_half] Error: {e}")
+        return []
+
+
+def crop_grid_2x2(grid_image_bytes: bytes) -> list[bytes]:
+    """
+    Convenience: Split a 2×2 grid into 4 individual images directly.
+    Uses crop_grid_to_halves() + crop_half_to_two() internally.
+
+    Returns:
+        list of 4 JPEG image bytes
+    """
+    halves = crop_grid_to_halves(grid_image_bytes)
+    if not halves:
+        return []
+    results = []
+    for half in halves:
+        poses = crop_half_to_two(half)
+        results.extend(poses)
+    return results
 
 
 def crop_grid_3x2(grid_image_bytes: bytes) -> list[bytes]:

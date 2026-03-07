@@ -6,10 +6,10 @@ Two-step flow:
   Step 1 (preview):  Receives images + details -> runs AI pipeline -> returns preview JSON
   Step 2 (confirm):  Receives confirmed preview data -> creates Shopify product
 
-Image Pipeline (cost-optimized — $0.014/product, 5 API calls total):
+Image Pipeline (cost-optimized — $0.012/product, 3 API calls total):
   1 OpenAI call      → Text (name, description, tags, SEO, dress_style)   $0.0003
   1 Replicate VTON   → 4-pose 2×2 grid image                              $0.01
-  4 Replicate ESRGAN → Upscale each cropped pose 4x                        $0.004
+  2 Replicate ESRGAN → Upscale 2 grid halves 4x                            $0.002
 """
 
 import functions_framework
@@ -188,7 +188,7 @@ def _handle_preview(request):
     suggested_collections = ai_result.get("suggested_collections", [])
     dress_style = ai_result.get("dress_style", "western").lower()
 
-    # ===== STEP 2: 4-Pose Grid → Crop → Upscale (1+4 Replicate calls — $0.014) =====
+    # ===== STEP 2: Grid → Split 2 → Upscale 2 → Crop 4 (1+2 Replicate calls — $0.012) =====
     print("[Preview] Step 2/2: Generating 4-pose images...")
     pose_images = generate_and_process_poses(
         garment_bytes=primary_image["bytes"],

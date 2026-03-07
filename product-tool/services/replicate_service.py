@@ -1,14 +1,15 @@
 """
 Replicate Service — 4-Pose Grid + Crop + Upscale Pipeline (v4)
 
-Cost-optimized: 1 VTON call + 4 upscale calls = $0.014/product
+Cost-optimized: 1 VTON call + 2 upscale calls = $0.012/product
 
 Pipeline:
   1. generate_4pose_grid()   → 1 call  → 2×2 grid image (4 poses)     $0.01
-  2. crop_grid_to_poses()    → local   → 4 individual 512×512 crops    $0.00
-  3. upscale_image()         → 4 calls → 4 upscaled 2048×2048 images   $0.004
+  2. crop_grid_to_halves()   → local   → 2 horizontal halves           $0.00
+  3. upscale_image() ×2      → 2 calls → 2 upscaled halves             $0.002
+  4. crop_half_to_poses()    → local   → 4 individual hi-res poses     $0.00
                                                                   ────────
-                                                            Total: $0.014
+                                                            Total: $0.012
 
 Background & poses auto-selected based on dress_style:
   traditional → warm/festive bg, ethnic poses
@@ -250,51 +251,88 @@ def generate_4pose_grid(
     return _run_vton(garment_bytes, prompt)
 
 
-def crop_grid_to_poses(grid_image_bytes: bytes) -> list[bytes]:
+def crop_grid_to_halves(grid_image_bytes: bytes) -> list[bytes]:
     """
-    Crop a 2×2 grid image into 4 individual square images.
+    Crop a 2×2 grid image into 2 horizontal halves.
 
-    Splits evenly into quadrants:
-      [ TL ] [ TR ]
-      [ BL ] [ BR ]
+    Splits into top row and bottom row:
+      Top half:    [ Pose 1 ] [ Pose 2 ]
+      Bottom half: [ Pose 3 ] [ Pose 4 ]
 
     Args:
         grid_image_bytes: bytes of the 2×2 grid image
 
     Returns:
-        list of 4 image bytes (JPEG), one per pose
+        list of 2 image bytes (JPEG) — [top_half, bottom_half]
     """
     try:
         img = Image.open(io.BytesIO(grid_image_bytes))
+        if img.mode != "RGB":
+            img = img.convert("RGB")
 
-        # Convert to RGB if needed
+        w, h = img.size
+        mid_y = h // 2
+
+        halves = [
+            img.crop((0, 0, w, mid_y)),     # Top row (Pose 1 + Pose 2)
+            img.crop((0, mid_y, w, h)),      # Bottom row (Pose 3 + Pose 4)
+        ]
+
+        results = []
+        labels = ["top-half", "bottom-half"]
+        for i, half in enumerate(halves):
+            buf = io.BytesIO()
+            half.save(buf, format="JPEG", quality=95)
+            half_bytes = buf.getvalue()
+            print(f"[CropHalf] {labels[i]}: {half.size[0]}×{half.size[1]}px, {len(half_bytes)} bytes")
+            results.append(half_bytes)
+
+        return results
+
+    except Exception as e:
+        print(f"[CropHalf] Error splitting grid: {e}")
+        return []
+
+
+def crop_half_to_poses(half_image_bytes: bytes, half_label: str = "half") -> list[bytes]:
+    """
+    Crop a horizontal half (2 side-by-side poses) into 2 individual images.
+
+    Splits a wide image at the midpoint:
+      [ Left Pose ] [ Right Pose ]
+
+    Args:
+        half_image_bytes: bytes of the half image (already upscaled)
+        half_label: label for logging
+
+    Returns:
+        list of 2 image bytes (JPEG) — [left_pose, right_pose]
+    """
+    try:
+        img = Image.open(io.BytesIO(half_image_bytes))
         if img.mode != "RGB":
             img = img.convert("RGB")
 
         w, h = img.size
         mid_x = w // 2
-        mid_y = h // 2
 
-        # Crop quadrants: top-left, top-right, bottom-left, bottom-right
-        crops = [
-            img.crop((0, 0, mid_x, mid_y)),          # Pose 1 (top-left)
-            img.crop((mid_x, 0, w, mid_y)),           # Pose 2 (top-right)
-            img.crop((0, mid_y, mid_x, h)),            # Pose 3 (bottom-left)
-            img.crop((mid_x, mid_y, w, h)),            # Pose 4 (bottom-right)
+        poses = [
+            img.crop((0, 0, mid_x, h)),     # Left pose
+            img.crop((mid_x, 0, w, h)),      # Right pose
         ]
 
         results = []
-        for i, crop in enumerate(crops):
+        for i, pose in enumerate(poses):
             buf = io.BytesIO()
-            crop.save(buf, format="JPEG", quality=92)
-            crop_bytes = buf.getvalue()
-            print(f"[Crop] Pose {i+1}: {crop.size[0]}×{crop.size[1]}px, {len(crop_bytes)} bytes")
-            results.append(crop_bytes)
+            pose.save(buf, format="JPEG", quality=92)
+            pose_bytes = buf.getvalue()
+            print(f"[CropPose] {half_label} pose-{i+1}: {pose.size[0]}×{pose.size[1]}px, {len(pose_bytes)} bytes")
+            results.append(pose_bytes)
 
         return results
 
     except Exception as e:
-        print(f"[Crop] Error splitting grid: {e}")
+        print(f"[CropPose] Error splitting {half_label}: {e}")
         return []
 
 
@@ -361,9 +399,14 @@ def generate_and_process_poses(
     extra_prompt: str = "",
 ) -> list[dict]:
     """
-    Full pipeline: Generate 4-pose grid → Crop → Upscale → Return 4 images.
+    Full pipeline: Grid → Split 2 halves → Upscale halves → Crop each → 4 images.
 
-    This is the main entry point called from main.py.
+    User's cost-optimized approach:
+      Step 1: Generate 2×2 grid           (1 VTON call  — $0.01)
+      Step 2: Crop grid into 2 halves     (local        — free)
+      Step 3: Upscale each half 4×        (2 ESRGAN     — $0.002)
+      Step 4: Crop each upscaled half     (local        — free)
+      Result: 4 high-res individual poses              = $0.012
 
     Args:
         garment_bytes: raw garment image bytes
@@ -377,43 +420,64 @@ def generate_and_process_poses(
     pose_labels = ["Front View", "Three-Quarter View", "Back Detail", "Dynamic Pose"]
 
     # ===== Step 1: Generate 2×2 grid (1 Replicate call — $0.01) =====
-    print("[Pipeline] Step 1: Generating 4-pose grid...")
+    print("[Pipeline] Step 1/4: Generating 4-pose grid...")
     grid_bytes = generate_4pose_grid(garment_bytes, dress_style, extra_prompt)
 
     if grid_bytes is None:
         print("[Pipeline] Grid generation failed — no images.")
         return []
 
-    # ===== Step 2: Crop into 4 individual poses (local, free) =====
-    print("[Pipeline] Step 2: Cropping grid into 4 poses...")
-    pose_crops = crop_grid_to_poses(grid_bytes)
+    # ===== Step 2: Crop grid into 2 horizontal halves (local, free) =====
+    print("[Pipeline] Step 2/4: Splitting grid into 2 halves...")
+    halves = crop_grid_to_halves(grid_bytes)
 
-    if not pose_crops:
-        print("[Pipeline] Cropping failed — returning grid as single image.")
+    if not halves or len(halves) < 2:
+        print("[Pipeline] Halving failed — returning grid as single image.")
         return [{
             "label": "4-Pose Grid",
             "bytes": grid_bytes,
             "filename": "poses-grid.jpg",
         }]
 
-    # ===== Step 3: Upscale each pose 4x (4 Replicate calls — $0.004) =====
-    print(f"[Pipeline] Step 3: Upscaling {len(pose_crops)} poses...")
-    results = []
+    # ===== Step 3: Upscale each half 4× (2 Replicate calls — $0.002) =====
+    print("[Pipeline] Step 3/4: Upscaling 2 halves...")
+    half_labels = ["top-half", "bottom-half"]
+    upscaled_halves = []
 
-    for i, crop_bytes in enumerate(pose_crops):
-        label = pose_labels[i] if i < len(pose_labels) else f"Pose {i+1}"
-
-        upscaled = upscale_image(crop_bytes, label=f"pose-{i+1}")
-
-        results.append({
-            "label": label,
-            "bytes": upscaled,
-            "filename": f"pose-{i+1}-{label.lower().replace(' ', '-')}.jpg",
-        })
-
-        # Small delay between upscale calls to avoid rate limits
-        if i < len(pose_crops) - 1:
+    for i, half_bytes in enumerate(halves):
+        upscaled = upscale_image(half_bytes, label=half_labels[i])
+        upscaled_halves.append(upscaled)
+        # Delay between upscale calls to avoid rate limits
+        if i < len(halves) - 1:
             time.sleep(2)
 
-    print(f"[Pipeline] Complete: {len(results)} images ready.")
+    # ===== Step 4: Crop each upscaled half into 2 individual poses (local, free) =====
+    print("[Pipeline] Step 4/4: Cropping upscaled halves into 4 poses...")
+    results = []
+    pose_idx = 0
+
+    for i, upscaled_half in enumerate(upscaled_halves):
+        poses = crop_half_to_poses(upscaled_half, half_label=half_labels[i])
+
+        if not poses:
+            # Fallback: return the upscaled half as-is
+            label = pose_labels[pose_idx] if pose_idx < len(pose_labels) else f"Pose {pose_idx+1}"
+            results.append({
+                "label": f"{label} (half)",
+                "bytes": upscaled_half,
+                "filename": f"pose-{pose_idx+1}-half.jpg",
+            })
+            pose_idx += 1
+            continue
+
+        for pose_bytes in poses:
+            label = pose_labels[pose_idx] if pose_idx < len(pose_labels) else f"Pose {pose_idx+1}"
+            results.append({
+                "label": label,
+                "bytes": pose_bytes,
+                "filename": f"pose-{pose_idx+1}-{label.lower().replace(' ', '-')}.jpg",
+            })
+            pose_idx += 1
+
+    print(f"[Pipeline] Complete: {len(results)} hi-res images ready.")
     return results
