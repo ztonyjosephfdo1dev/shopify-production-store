@@ -10,28 +10,70 @@ import httpx
 
 
 SHOPIFY_STORE = os.environ.get("SHOPIFY_STORE", "udfphb-uk.myshopify.com")
-SHOPIFY_TOKEN = os.environ.get("SHOPIFY_ACCESS_TOKEN", "")
+SHOPIFY_CLIENT_ID = os.environ.get("SHOPIFY_CLIENT_ID", "")
+SHOPIFY_CLIENT_SECRET = os.environ.get("SHOPIFY_CLIENT_SECRET", "")
 API_VERSION = "2026-01"
 GRAPHQL_URL = f"https://{SHOPIFY_STORE}/admin/api/{API_VERSION}/graphql.json"
+TOKEN_URL = f"https://{SHOPIFY_STORE}/admin/oauth/access_token"
 
-HEADERS = {
-    "Content-Type": "application/json",
-    "X-Shopify-Access-Token": SHOPIFY_TOKEN,
+# Mutable token — refreshed automatically at runtime when 401 occurs
+_token_state = {
+    "token": os.environ.get("SHOPIFY_ACCESS_TOKEN", "")
 }
 
 
-def _graphql(query: str, variables: dict = None) -> dict:
-    """Execute a Shopify GraphQL query."""
+def _refresh_token() -> str:
+    """
+    Regenerate Shopify access token via Client Credentials Grant.
+    Called automatically on 401 — no manual intervention needed.
+    """
+    if not SHOPIFY_CLIENT_ID or not SHOPIFY_CLIENT_SECRET:
+        raise Exception(
+            "Token expired (401) and SHOPIFY_CLIENT_ID/SHOPIFY_CLIENT_SECRET "
+            "are not set — cannot auto-refresh. Update .env.yaml and redeploy."
+        )
+    response = httpx.post(
+        TOKEN_URL,
+        json={
+            "client_id": SHOPIFY_CLIENT_ID,
+            "client_secret": SHOPIFY_CLIENT_SECRET,
+            "grant_type": "client_credentials",
+        },
+        timeout=15.0,
+    )
+    response.raise_for_status()
+    new_token = response.json().get("access_token", "")
+    if not new_token:
+        raise Exception("Token refresh returned empty access_token")
+    _token_state["token"] = new_token
+    print("[shopify] Token auto-refreshed via Client Credentials Grant")
+    return new_token
+
+
+def _graphql(query: str, variables: dict = None, _retry: bool = True) -> dict:
+    """Execute a Shopify GraphQL query. Auto-refreshes token on 401."""
     payload = {"query": query}
     if variables:
         payload["variables"] = variables
 
+    headers = {
+        "Content-Type": "application/json",
+        "X-Shopify-Access-Token": _token_state["token"],
+    }
+
     response = httpx.post(
         GRAPHQL_URL,
-        headers=HEADERS,
+        headers=headers,
         json=payload,
         timeout=30.0,
     )
+
+    # Auto-refresh and retry once on 401
+    if response.status_code == 401 and _retry and SHOPIFY_CLIENT_ID:
+        print("[shopify] 401 received — auto-refreshing token...")
+        _refresh_token()
+        return _graphql(query, variables, _retry=False)
+
     response.raise_for_status()
     data = response.json()
 

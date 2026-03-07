@@ -7,6 +7,8 @@ import sys
 import os
 import shutil
 
+sys.stdout.reconfigure(encoding='utf-8', errors='replace') if hasattr(sys.stdout, 'reconfigure') else None
+
 # --- Config ---
 SOURCE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEPLOY_DIR = r"C:\tmp\pookie-deploy"
@@ -91,10 +93,10 @@ def deploy():
         f.write(r.stderr)
 
     if r.returncode == 0:
-        print("✅ Deploy SUCCESSFUL!")
+        print("[OK] Deploy SUCCESSFUL!")
         print(f"Logs: {log_file}")
     else:
-        print(f"❌ Deploy FAILED (exit code {r.returncode})")
+        print(f"[FAIL] Deploy FAILED (exit code {r.returncode})")
         print(f"Error log: {err_file}")
         print(f"\nLast 20 lines of stderr:\n{chr(10).join(r.stderr.splitlines()[-20:])}")
 
