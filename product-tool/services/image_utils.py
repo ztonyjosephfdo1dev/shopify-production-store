@@ -1,5 +1,10 @@
 """
-Image Utility Service
+⚠️  DEPRECATED — No longer used in the v2 pipeline.
+Detail crop replaced by the 3×2 collage grid (single Replicate call).
+
+Kept for reference only. Safe to delete.
+---
+Image Utility Service (v1 — DEPRECATED)
 Handles local image processing (no external API needed).
 - Detail/close-up crop from raw photo
 """

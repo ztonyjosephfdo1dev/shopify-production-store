@@ -1,5 +1,11 @@
 """
-Photoroom API Service
+⚠️  DEPRECATED — No longer used in the v2 pipeline.
+Photoroom has been removed to cut costs.
+Background is now handled by the Replicate VTON model via smart prompts.
+
+Kept for reference only. Safe to delete.
+---
+Photoroom API Service (v1 — DEPRECATED)
 - remove_background: removes BG and places product on white
 - create_styled_background: removes BG and adds an AI-generated complementary background
 """

@@ -1,9 +1,13 @@
 """
-Pookie Style — AI Product Creation Tool
+Pookie Style — AI Product Creation Tool (v2)
 Google Cloud Function Entry Point
 
 Receives multipart form data (images + product details),
-runs AI pipeline, creates Shopify product.
+runs AI pipeline (3 API calls total), creates Shopify product.
+
+Image Pipeline (cost-optimized):
+  Image 1 → Hero front shot (VTON + smart background based on dress style)
+  Image 2 → 3×2 collage grid (6 poses/styles in ONE single API call)
 """
 
 import functions_framework
@@ -12,15 +16,13 @@ import os
 import base64
 import traceback
 from services.openai_service import analyze_and_generate_text
-from services.photoroom_service import remove_background, create_styled_background
-from services.replicate_service import virtual_tryon
+from services.replicate_service import virtual_tryon_hero, virtual_tryon_collage_grid
 from services.shopify_service import (
     upload_image_to_shopify,
     create_product,
     assign_to_collections,
     get_collection_id_by_handle,
 )
-from services.image_utils import create_detail_crop
 
 
 @functions_framework.http
@@ -36,8 +38,12 @@ def create_product_handler(request):
       - category: collection handle (optional)
       - name: product name (optional)
       - description: notes/description (optional)
+      - extra_prompt: custom styling/pose instruction (optional)
 
     Returns JSON with product URL and admin URL.
+
+    Total API calls: 3 (1 OpenAI + 1 Replicate hero + 1 Replicate collage)
+    Total images uploaded to Shopify: 2
     """
 
     # --- CORS headers ---
@@ -74,6 +80,7 @@ def create_product_handler(request):
         category = request.form.get("category", "")
         user_name = request.form.get("name", "")
         user_description = request.form.get("description", "")
+        extra_prompt = request.form.get("extra_prompt", "")  # User custom styling/pose instruction
 
         if not price or not compare_at_price:
             return (
@@ -106,7 +113,7 @@ def create_product_handler(request):
 
         primary_image = raw_images[0]
 
-        # ===== STEP 1: AI Text Generation (GPT-4.1-nano) =====
+        # ===== STEP 1: AI Text Generation (1 OpenAI call) =====
         ai_result = analyze_and_generate_text(
             images=raw_images,
             user_name=user_name,
@@ -120,31 +127,43 @@ def create_product_handler(request):
         seo_description = ai_result.get("seo_description", "")
         detected_garment_type = ai_result.get("detected_garment_type", "")
         suggested_collections = ai_result.get("suggested_collections", [])
+        # dress_style → "traditional" | "western" | "fusion" | "formal"
+        dress_style = ai_result.get("dress_style", "western").lower()
 
-        # ===== STEP 2: Photoroom — White Background (Image 1) =====
-        white_bg_bytes = remove_background(primary_image["bytes"])
+        # ===== STEP 2: Image 1 — Hero Front Shot (1 Replicate call) =====
+        # Smart background auto-selected based on dress style
+        hero_bytes = virtual_tryon_hero(
+            garment_bytes=primary_image["bytes"],
+            dress_style=dress_style,
+            extra_prompt=extra_prompt,
+        )
 
-        # ===== STEP 3: Photoroom — Styled Background (Image 2) =====
-        styled_bg_bytes = create_styled_background(primary_image["bytes"])
+        # ===== STEP 3: Image 2 — 3×2 Collage Grid (1 Replicate call) =====
+        # Single API call generates all 6 poses/styles in one grid image
+        collage_bytes = virtual_tryon_collage_grid(
+            garment_bytes=primary_image["bytes"],
+            dress_style=dress_style,
+            extra_prompt=extra_prompt,
+        )
 
-        # ===== STEP 4: Replicate VTON — On-Model Shot (Image 3) =====
-        vton_bytes = virtual_tryon(primary_image["bytes"])
-
-        # ===== STEP 5: Detail Crop (Image 4) =====
-        detail_bytes = create_detail_crop(primary_image["bytes"])
-
-        # ===== STEP 6: Upload all images to Shopify =====
+        # ===== STEP 4: Upload to Shopify (2 images only) =====
         processed_images = [
-            {"bytes": white_bg_bytes, "filename": "white-bg.jpg", "alt": f"{product_name} - White Background"},
-            {"bytes": styled_bg_bytes, "filename": "styled-bg.jpg", "alt": f"{product_name} - Styled"},
-            {"bytes": vton_bytes, "filename": "on-model.jpg", "alt": f"{product_name} - On Model"},
-            {"bytes": detail_bytes, "filename": "detail.jpg", "alt": f"{product_name} - Detail"},
+            {
+                "bytes": hero_bytes,
+                "filename": "hero-front.jpg",
+                "alt": f"{product_name} - Front View",
+            },
+            {
+                "bytes": collage_bytes,
+                "filename": "poses-collage.jpg",
+                "alt": f"{product_name} - All Poses",
+            },
         ]
 
-        # Filter out any None images (if an API failed gracefully)
+        # Filter out None (if an API call failed gracefully)
         valid_images = [img for img in processed_images if img["bytes"] is not None]
 
-        # Also include raw image as fallback if all processing failed
+        # Fallback: use raw upload if all processing failed
         if not valid_images:
             valid_images = [
                 {"bytes": primary_image["bytes"], "filename": "original.jpg", "alt": product_name}
@@ -160,7 +179,7 @@ def create_product_handler(request):
             if media_id:
                 uploaded_media.append(media_id)
 
-        # ===== STEP 7: Create Shopify Product =====
+        # ===== STEP 5: Create Shopify Product =====
         product_result = create_product(
             title=product_name,
             description_html=description_html,
@@ -176,13 +195,12 @@ def create_product_handler(request):
             status="DRAFT",
         )
 
-        # ===== STEP 8: Assign to Collections =====
-        # Use user-selected category or AI-suggested collections
+        # ===== STEP 6: Assign Collections =====
         collection_handles = []
         if category:
             collection_handles = [category]
         elif suggested_collections:
-            collection_handles = suggested_collections[:3]  # Max 3 collections
+            collection_handles = suggested_collections[:3]
 
         product_id = product_result.get("product_id")
         if product_id and collection_handles:
@@ -206,8 +224,10 @@ def create_product_handler(request):
                     "images_uploaded": len(uploaded_media),
                     "tags_count": len(tags),
                     "collections_assigned": collection_handles,
+                    "dress_style": dress_style,
                     "ai_analysis": {
                         "garment_type": detected_garment_type,
+                        "dress_style": dress_style,
                         "color": ai_result.get("detected_color", ""),
                         "fabric": ai_result.get("detected_fabric", ""),
                         "style": ai_result.get("detected_style", ""),

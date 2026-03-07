@@ -1,7 +1,7 @@
 """
 OpenAI GPT-4.1-nano Service
 Single API call: image analysis + structured JSON output
-Generates: product name, description, 35-50 tags, SEO, garment analysis
+Generates: product name, description, 35-50 tags, SEO, garment analysis, dress style
 """
 
 import os
@@ -26,8 +26,15 @@ RESPOND ONLY WITH VALID JSON matching this exact schema:
   "detected_garment_type": "Type (kurti, top, dress, gown, cord-set, palazzo, skirt, etc.)",
   "detected_style": "Style (casual, ethnic, western, indo-western, party, office, etc.)",
   "detected_occasion": "Occasion (daily-wear, party, wedding, festival, office, date-night, etc.)",
+  "dress_style": "EXACTLY one of: traditional | western | fusion | formal — based on the garment's overall look and styling",
   "suggested_collections": ["array of 1-3 Shopify collection handles that best match this product"]
 }
+
+DRESS STYLE GUIDE (pick exactly one):
+- "traditional": Sarees, lehengas, salwar suits, kurtis with heavy embroidery/ethnic motifs, anarkalis, sharara sets
+- "western": Crop tops, bodycon dresses, jeans, shorts, western dresses, casual t-shirts, hoodies
+- "fusion": Indo-western outfits, dhoti pants with crop tops, kurtis with jeans styling, modern cuts on ethnic fabric
+- "formal": Blazers, formal dresses, pencil skirts, office wear, structured silhouettes
 
 Available collection handles for suggested_collections:
 kurti, kurti-set, kurthi-set, suits, indo-western, tops, top, casual-top, korean-top, shirt, blouse, bodycon, fancy-crop-top, top-wear, single-piece, gown, gown-1, maxi, casual-maxi, cord-set, bottom, bottom-1, plazo, skirt, inners, panties, skin-care, face-wash, body-lotion, hair-mask, face-mask, foot-mask, bb-cream, eye-lashes, fix-spray, powder, sun-screen, hand-cream, mascara, washing-soap
@@ -41,6 +48,7 @@ IMPORTANT:
 - Include trending keywords (e.g., "instagram fashion", "viral outfit")
 - Product name should be specific and descriptive, not generic
 - Description should mention fabric feel, who it's for, and how to style it
+- dress_style MUST be one of: traditional, western, fusion, formal
 """
 
 
@@ -114,6 +122,13 @@ def analyze_and_generate_text(images: list, user_name: str = "", user_descriptio
                 if tag not in existing:
                     result["tags"].append(tag)
 
+        # Validate dress_style — must be one of the allowed values
+        valid_styles = {"traditional", "western", "fusion", "formal"}
+        if result.get("dress_style", "").lower() not in valid_styles:
+            result["dress_style"] = "western"  # Safe default
+        else:
+            result["dress_style"] = result["dress_style"].lower()
+
         return result
 
     except Exception as e:
@@ -142,5 +157,6 @@ def analyze_and_generate_text(images: list, user_name: str = "", user_descriptio
             "detected_garment_type": "",
             "detected_style": "casual",
             "detected_occasion": "daily-wear",
+            "dress_style": "western",
             "suggested_collections": [],
         }
