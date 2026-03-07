@@ -201,17 +201,6 @@ def create_product(
     Returns:
         dict with product_id, handle, numeric_id
     """
-    # Build variants (one per size)
-    variants = []
-    for size in sizes:
-        variants.append(
-            {
-                "optionValues": [{"optionName": "Size", "name": size}],
-                "price": str(price),
-                "compareAtPrice": str(compare_at_price),
-            }
-        )
-
     # Build media from staged upload URLs
     media = []
     for url in media_ids:
@@ -222,7 +211,8 @@ def create_product(
             }
         )
 
-    mutation = """
+    # Step 1: Create product WITHOUT variants (removed from ProductCreateInput in API v2024-01+)
+    create_mutation = """
     mutation productCreate($product: ProductCreateInput!, $media: [CreateMediaInput!]) {
         productCreate(product: $product, media: $media) {
             product {
@@ -239,7 +229,7 @@ def create_product(
     }
     """
 
-    variables = {
+    create_variables = {
         "product": {
             "title": title,
             "descriptionHtml": description_html,
@@ -248,7 +238,6 @@ def create_product(
             "tags": tags,
             "status": status,
             "productOptions": [{"name": "Size", "values": [{"name": s} for s in sizes]}],
-            "variants": variants,
             "seo": {
                 "title": seo_title,
                 "description": seo_description,
@@ -257,7 +246,7 @@ def create_product(
         "media": media,
     }
 
-    data = _graphql(mutation, variables)
+    data = _graphql(create_mutation, create_variables)
     result = data.get("productCreate", {})
 
     errors = result.get("userErrors", [])
@@ -266,8 +255,42 @@ def create_product(
 
     product = result.get("product", {})
     product_gid = product.get("id", "")
-    # Extract numeric ID from GID (e.g., "gid://shopify/Product/12345" -> "12345")
     numeric_id = product_gid.split("/")[-1] if product_gid else ""
+
+    # Step 2: Create variants separately via productVariantsBulkCreate (required in API v2024-01+)
+    variants_input = []
+    for size in sizes:
+        variants_input.append(
+            {
+                "optionValues": [{"optionName": "Size", "name": size}],
+                "price": str(price),
+                "compareAtPrice": str(compare_at_price),
+            }
+        )
+
+    variants_mutation = """
+    mutation productVariantsBulkCreate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+        productVariantsBulkCreate(productId: $productId, variants: $variants) {
+            productVariants {
+                id
+                title
+                price
+            }
+            userErrors {
+                field
+                message
+            }
+        }
+    }
+    """
+
+    variants_data = _graphql(variants_mutation, {
+        "productId": product_gid,
+        "variants": variants_input,
+    })
+    variant_errors = variants_data.get("productVariantsBulkCreate", {}).get("userErrors", [])
+    if variant_errors:
+        print(f"Variant creation errors (non-fatal): {json.dumps(variant_errors)}")
 
     return {
         "product_id": product_gid,
