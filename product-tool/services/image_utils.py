@@ -1,57 +1,141 @@
 """
-⚠️  DEPRECATED — No longer used in the v2 pipeline.
-Detail crop replaced by the 3×2 collage grid (single Replicate call).
+Image Utility Service (v4)
+Local image processing helpers — no external API calls.
 
-Kept for reference only. Safe to delete.
----
-Image Utility Service (v1 — DEPRECATED)
-Handles local image processing (no external API needed).
-- Detail/close-up crop from raw photo
+Functions:
+  crop_grid_2x2()     — Split a 2×2 grid into 4 images
+  crop_grid_3x2()     — Split a 3×2 grid into 6 images (future use)
+  resize_for_shopify() — Resize to Shopify-optimal dimensions
 """
 
 import io
 from PIL import Image
 
 
-def create_detail_crop(image_bytes: bytes, crop_ratio: float = 0.4) -> bytes | None:
+def crop_grid_2x2(grid_image_bytes: bytes) -> list[bytes]:
     """
-    Create a detail/close-up crop from the center of the image.
-    Crops the center portion to show fabric/pattern detail.
+    Split a 2×2 grid image into 4 individual square images.
+
+    Layout:
+      [ TL ] [ TR ]
+      [ BL ] [ BR ]
+
+    Args:
+        grid_image_bytes: bytes of the 2×2 grid image
+
+    Returns:
+        list of 4 JPEG image bytes, one per quadrant
+    """
+    try:
+        img = Image.open(io.BytesIO(grid_image_bytes))
+        if img.mode != "RGB":
+            img = img.convert("RGB")
+
+        w, h = img.size
+        mid_x = w // 2
+        mid_y = h // 2
+
+        boxes = [
+            (0, 0, mid_x, mid_y),          # Top-left
+            (mid_x, 0, w, mid_y),           # Top-right
+            (0, mid_y, mid_x, h),           # Bottom-left
+            (mid_x, mid_y, w, h),           # Bottom-right
+        ]
+
+        results = []
+        for i, box in enumerate(boxes):
+            crop = img.crop(box)
+            buf = io.BytesIO()
+            crop.save(buf, format="JPEG", quality=92)
+            results.append(buf.getvalue())
+            print(f"[crop_2x2] Panel {i+1}: {crop.size[0]}×{crop.size[1]}px")
+
+        return results
+
+    except Exception as e:
+        print(f"[crop_2x2] Error: {e}")
+        return []
+
+
+def crop_grid_3x2(grid_image_bytes: bytes) -> list[bytes]:
+    """
+    Split a 3×2 grid image into 6 individual images.
+
+    Layout:
+      [ 1 ] [ 2 ]
+      [ 3 ] [ 4 ]
+      [ 5 ] [ 6 ]
+
+    Args:
+        grid_image_bytes: bytes of the 3×2 grid image
+
+    Returns:
+        list of 6 JPEG image bytes
+    """
+    try:
+        img = Image.open(io.BytesIO(grid_image_bytes))
+        if img.mode != "RGB":
+            img = img.convert("RGB")
+
+        w, h = img.size
+        col_w = w // 2
+        row_h = h // 3
+
+        results = []
+        for row in range(3):
+            for col in range(2):
+                box = (
+                    col * col_w,
+                    row * row_h,
+                    (col + 1) * col_w,
+                    (row + 1) * row_h,
+                )
+                crop = img.crop(box)
+                buf = io.BytesIO()
+                crop.save(buf, format="JPEG", quality=92)
+                results.append(buf.getvalue())
+                idx = row * 2 + col + 1
+                print(f"[crop_3x2] Panel {idx}: {crop.size[0]}×{crop.size[1]}px")
+
+        return results
+
+    except Exception as e:
+        print(f"[crop_3x2] Error: {e}")
+        return []
+
+
+def resize_for_shopify(image_bytes: bytes, max_dim: int = 2048) -> bytes:
+    """
+    Resize image to fit within max_dim while maintaining aspect ratio.
+    Shopify recommends 2048×2048 max for product images.
 
     Args:
         image_bytes: raw image bytes
-        crop_ratio: portion of the image to crop (0.4 = center 40%)
+        max_dim: maximum width or height
 
     Returns:
-        bytes of the cropped image, or None on failure
+        resized JPEG image bytes
     """
     try:
         img = Image.open(io.BytesIO(image_bytes))
-        width, height = img.size
+        if img.mode != "RGB":
+            img = img.convert("RGB")
 
-        # Calculate center crop box
-        crop_w = int(width * crop_ratio)
-        crop_h = int(height * crop_ratio)
-        left = (width - crop_w) // 2
-        top = (height - crop_h) // 2
-        right = left + crop_w
-        bottom = top + crop_h
+        w, h = img.size
+        if w <= max_dim and h <= max_dim:
+            return image_bytes  # Already within limits
 
-        # Crop and resize to a reasonable product image size
-        cropped = img.crop((left, top, right, bottom))
+        # Scale down preserving aspect ratio
+        ratio = min(max_dim / w, max_dim / h)
+        new_w = int(w * ratio)
+        new_h = int(h * ratio)
 
-        # Resize to 1024x1024 for consistency
-        cropped = cropped.resize((1024, 1024), Image.LANCZOS)
-
-        # Convert to RGB if needed (handles RGBA/palette images)
-        if cropped.mode != "RGB":
-            cropped = cropped.convert("RGB")
-
-        # Save to bytes
-        output = io.BytesIO()
-        cropped.save(output, format="JPEG", quality=90)
-        return output.getvalue()
+        resized = img.resize((new_w, new_h), Image.LANCZOS)
+        buf = io.BytesIO()
+        resized.save(buf, format="JPEG", quality=90)
+        print(f"[resize] {w}×{h} → {new_w}×{new_h}")
+        return buf.getvalue()
 
     except Exception as e:
-        print(f"Detail crop error: {e}")
-        return None
+        print(f"[resize] Error: {e}")
+        return image_bytes

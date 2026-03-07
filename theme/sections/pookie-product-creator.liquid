@@ -330,12 +330,14 @@
 
   /* --- Progress Animation --- */
   var progressSteps = [
-    { pct: 10, text: 'Uploading images...' },
-    { pct: 25, text: 'AI analyzing product photos...' },
-    { pct: 40, text: 'Generating product name, description & tags...' },
-    { pct: 55, text: 'Creating hero image with model...' },
-    { pct: 70, text: 'Generating 6-pose collage grid...' },
-    { pct: 85, text: 'Preparing preview...' },
+    { pct: 8, text: 'Uploading images...' },
+    { pct: 20, text: 'AI analyzing product photos...' },
+    { pct: 35, text: 'Generating product name, description & tags...' },
+    { pct: 50, text: 'Creating 4-pose model grid...' },
+    { pct: 65, text: 'Cropping individual poses...' },
+    { pct: 75, text: 'Upscaling pose 1 & 2...' },
+    { pct: 88, text: 'Upscaling pose 3 & 4...' },
+    { pct: 95, text: 'Preparing preview...' },
   ];
 
   function animateProgress() {
@@ -345,7 +347,7 @@
       progressFill.style.width = progressSteps[i].pct + '%';
       progressText.textContent = progressSteps[i].text;
       i++;
-    }, 12000);
+    }, 4000);
     return interval;
   }
 

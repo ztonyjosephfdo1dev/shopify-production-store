@@ -1,31 +1,59 @@
 """
-Pookie Style — AI Product Creation Tool (v3)
+Pookie Style — AI Product Creation Tool (v4)
 Google Cloud Function Entry Point
 
 Two-step flow:
   Step 1 (preview):  Receives images + details -> runs AI pipeline -> returns preview JSON
   Step 2 (confirm):  Receives confirmed preview data -> creates Shopify product
 
-Image Pipeline (cost-optimized, 3 API calls total):
-  1 OpenAI call  -> Text (name, description, tags, SEO, dress_style)
-  1 Replicate    -> Hero front shot (VTON + smart background)
-  1 Replicate    -> 3x2 collage grid (6 poses/styles in ONE call)
+Image Pipeline (cost-optimized — $0.014/product, 5 API calls total):
+  1 OpenAI call      → Text (name, description, tags, SEO, dress_style)   $0.0003
+  1 Replicate VTON   → 4-pose 2×2 grid image                              $0.01
+  4 Replicate ESRGAN → Upscale each cropped pose 4x                        $0.004
 """
 
 import functions_framework
 import json
 import os
 import base64
-import time
 import traceback
 from services.openai_service import analyze_and_generate_text
-from services.replicate_service import virtual_tryon_hero, virtual_tryon_collage_grid
+from services.replicate_service import generate_and_process_poses
 from services.shopify_service import (
     upload_image_to_shopify,
     create_product,
     assign_to_collections,
     get_collection_id_by_handle,
 )
+
+
+# ---- Collection mapping tables (reusable) ----
+
+CATEGORY_TO_COLLECTION = {
+    "kurti": ["kurti"], "kurti-set": ["kurti-set", "kurthi-set"],
+    "suits": ["suits"], "indo-western": ["indo-western"],
+    "top-wear": ["top-wear", "tops"], "tops": ["tops", "top-wear"],
+    "casual-top": ["casual-top", "tops"], "korean-top": ["korean-top", "tops"],
+    "shirt": ["shirt", "tops"], "blouse": ["blouse", "tops"],
+    "bodycon": ["bodycon"], "fancy-crop-top": ["fancy-crop-top", "tops", "top-wear"],
+    "single-piece": ["single-piece"], "gown": ["gown", "gown-1"],
+    "maxi": ["maxi"], "casual-maxi": ["casual-maxi", "maxi"],
+    "cord-set": ["cord-set"], "bottom": ["bottom", "bottom-1"],
+    "plazo": ["plazo", "bottom"], "skirt": ["skirt", "bottom"],
+    "inners": ["inners", "panties"],
+    "skin-care": ["skin-care"], "face-wash": ["face-wash", "skin-care"],
+    "body-lotion": ["body-lotion", "skin-care"],
+}
+
+GARMENT_TO_COLLECTION = {
+    "crop top": ["fancy-crop-top", "tops"], "crop-top": ["fancy-crop-top", "tops"],
+    "top": ["tops", "top-wear"], "t-shirt": ["tops", "casual-top"],
+    "kurti": ["kurti"], "dress": ["single-piece"], "gown": ["gown"],
+    "maxi": ["maxi"], "palazzo": ["plazo"], "skirt": ["skirt"],
+    "blouse": ["blouse", "tops"], "shirt": ["shirt", "tops"],
+    "bodycon": ["bodycon"], "cord-set": ["cord-set"],
+    "korean top": ["korean-top", "tops"], "polo": ["tops", "top-wear"],
+}
 
 
 def _cors_headers():
@@ -49,31 +77,35 @@ def _error(msg, status=400):
     return (json.dumps({"success": False, "error": msg}), status, _cors_headers())
 
 
+def _resolve_collections(category: str, suggested: list, garment_type: str) -> list:
+    """Resolve collection handles with multiple fallback layers."""
+    if category and category in CATEGORY_TO_COLLECTION:
+        return CATEGORY_TO_COLLECTION[category]
+    if category:
+        return [category]
+    if suggested:
+        return suggested[:3]
+    if garment_type:
+        gt = garment_type.lower().strip()
+        return GARMENT_TO_COLLECTION.get(gt, ["tops", "top-wear"])
+    return ["tops", "top-wear"]
+
+
 @functions_framework.http
 def create_product_handler(request):
     """
     HTTP Cloud Function entry point.
     Routes to preview or confirm based on ?action= query param.
-
-    action=preview (default):
-      Input:  multipart/form-data with images, price, sizes, etc.
-      Output: JSON with AI-generated name, description, tags, generated image base64
-
-    action=confirm:
-      Input:  JSON body with confirmed product data + base64 images
-      Output: JSON with Shopify product URL
     """
     if request.method == "OPTIONS":
         return _cors_preflight()
 
     try:
         action = request.args.get("action", "preview")
-
         if action == "confirm":
             return _handle_confirm(request)
         else:
             return _handle_preview(request)
-
     except Exception as e:
         traceback.print_exc()
         return (
@@ -84,12 +116,19 @@ def create_product_handler(request):
 
 
 # ===========================================================================
-# STEP 1: PREVIEW — AI text + image generation, returns preview data
+# STEP 1: PREVIEW — AI text + 4-pose image generation
 # ===========================================================================
 def _handle_preview(request):
     """
     Processes images through AI pipeline and returns preview data.
-    Does NOT create a Shopify product — just returns what WOULD be created.
+    Does NOT create a Shopify product.
+
+    Pipeline:
+      1. OpenAI → name, description, tags, SEO, dress_style
+      2. Replicate VTON → 4-pose 2×2 grid
+      3. Local crop → 4 individual poses
+      4. Replicate ESRGAN → upscale each 4x
+      5. Return 4 base64 images + all text data
     """
     files = request.files.getlist("images")
     if not files:
@@ -126,21 +165,16 @@ def _handle_preview(request):
 
     primary_image = raw_images[0]
 
-    # ===== STEP 1: AI Text Generation (1 OpenAI call) =====
-    # AI ALWAYS analyzes the image + user notes to generate name, description, tags
+    # ===== STEP 1: AI Text Generation (1 OpenAI call — $0.0003) =====
+    print("[Preview] Step 1/2: AI text generation...")
     ai_result = analyze_and_generate_text(
         images=raw_images,
         user_name=user_name,
         user_description=user_description,
     )
 
-    # Product name: use AI-generated (incorporates user_name as a hint)
     product_name = ai_result.get("product_name", user_name or "New Product")
 
-    # Description logic:
-    #   - AI always generates a description from image + user notes
-    #   - If user checked "use my description", we use their text as-is
-    #   - Both are sent in preview so user can switch in the preview screen
     ai_description = ai_result.get("description", "<p>Beautiful fashion product by Pookie Style.</p>")
     if use_my_description and user_description:
         description_html = f"<p>{user_description}</p>"
@@ -154,40 +188,24 @@ def _handle_preview(request):
     suggested_collections = ai_result.get("suggested_collections", [])
     dress_style = ai_result.get("dress_style", "western").lower()
 
-    # ===== STEP 2: Hero Image (1 Replicate call) =====
-    hero_bytes = virtual_tryon_hero(
+    # ===== STEP 2: 4-Pose Grid → Crop → Upscale (1+4 Replicate calls — $0.014) =====
+    print("[Preview] Step 2/2: Generating 4-pose images...")
+    pose_images = generate_and_process_poses(
         garment_bytes=primary_image["bytes"],
         dress_style=dress_style,
         extra_prompt=extra_prompt,
     )
 
-    # Wait between calls to avoid Replicate 429 rate limit (free tier: burst of 1)
-    if hero_bytes:
-        time.sleep(15)
-
-    # ===== STEP 3: Collage Grid (1 Replicate call) =====
-    collage_bytes = virtual_tryon_collage_grid(
-        garment_bytes=primary_image["bytes"],
-        dress_style=dress_style,
-        extra_prompt=extra_prompt,
-    )
-
-    # Build image data for preview (base64 for display in browser)
+    # Build preview images (base64 for browser display)
     preview_images = []
-    if hero_bytes:
+    for img_data in pose_images:
         preview_images.append({
-            "label": "Hero - Front View",
-            "base64": base64.b64encode(hero_bytes).decode("utf-8"),
-            "filename": "hero-front.jpg",
-        })
-    if collage_bytes:
-        preview_images.append({
-            "label": "6-Pose Collage Grid",
-            "base64": base64.b64encode(collage_bytes).decode("utf-8"),
-            "filename": "poses-collage.jpg",
+            "label": img_data["label"],
+            "base64": base64.b64encode(img_data["bytes"]).decode("utf-8"),
+            "filename": img_data["filename"],
         })
 
-    # Fallback: if both image generations failed, include the raw uploaded photo
+    # Fallback: if image generation failed entirely, include raw upload
     if not preview_images:
         preview_images.append({
             "label": "Original Upload (AI generation unavailable)",
@@ -195,49 +213,13 @@ def _handle_preview(request):
             "filename": "original.jpg",
         })
 
-    # Determine collections — multiple fallback layers
-    CATEGORY_TO_COLLECTION = {
-        "kurti": ["kurti"], "kurti-set": ["kurti-set", "kurthi-set"],
-        "suits": ["suits"], "indo-western": ["indo-western"],
-        "top-wear": ["top-wear", "tops"], "tops": ["tops", "top-wear"],
-        "casual-top": ["casual-top", "tops"], "korean-top": ["korean-top", "tops"],
-        "shirt": ["shirt", "tops"], "blouse": ["blouse", "tops"],
-        "bodycon": ["bodycon"], "fancy-crop-top": ["fancy-crop-top", "tops", "top-wear"],
-        "single-piece": ["single-piece"], "gown": ["gown", "gown-1"],
-        "maxi": ["maxi"], "casual-maxi": ["casual-maxi", "maxi"],
-        "cord-set": ["cord-set"], "bottom": ["bottom", "bottom-1"],
-        "plazo": ["plazo", "bottom"], "skirt": ["skirt", "bottom"],
-        "inners": ["inners", "panties"],
-        "skin-care": ["skin-care"], "face-wash": ["face-wash", "skin-care"],
-        "body-lotion": ["body-lotion", "skin-care"],
-    }
-    # Garment type → collection mapping for AI-detected types
-    GARMENT_TO_COLLECTION = {
-        "crop top": ["fancy-crop-top", "tops"], "crop-top": ["fancy-crop-top", "tops"],
-        "top": ["tops", "top-wear"], "t-shirt": ["tops", "casual-top"],
-        "kurti": ["kurti"], "dress": ["single-piece"], "gown": ["gown"],
-        "maxi": ["maxi"], "palazzo": ["plazo"], "skirt": ["skirt"],
-        "blouse": ["blouse", "tops"], "shirt": ["shirt", "tops"],
-        "bodycon": ["bodycon"], "cord-set": ["cord-set"],
-        "korean top": ["korean-top", "tops"], "polo": ["tops", "top-wear"],
-    }
-
-    collection_handles = []
-    if category and category in CATEGORY_TO_COLLECTION:
-        collection_handles = CATEGORY_TO_COLLECTION[category]
-    elif category:
-        collection_handles = [category]
-    elif suggested_collections:
-        collection_handles = suggested_collections[:3]
-    elif detected_garment_type:
-        # Use AI-detected garment type to find collections
-        gt_lower = detected_garment_type.lower().strip()
-        collection_handles = GARMENT_TO_COLLECTION.get(gt_lower, ["tops", "top-wear"])
-    else:
-        # Ultimate fallback
-        collection_handles = ["tops", "top-wear"]
+    # Resolve collections
+    collection_handles = _resolve_collections(
+        category, suggested_collections, detected_garment_type
+    )
 
     # ===== Return preview (NOT yet created on Shopify) =====
+    print(f"[Preview] Done: {len(preview_images)} images, {len(tags)} tags")
     return (
         json.dumps({
             "success": True,
@@ -263,7 +245,6 @@ def _handle_preview(request):
                     "style": ai_result.get("detected_style", ""),
                     "occasion": ai_result.get("detected_occasion", ""),
                 },
-                # Always include AI-generated alternatives so user can switch
                 "ai_description": ai_description,
                 "ai_product_name": ai_result.get("product_name", ""),
             },
@@ -301,6 +282,7 @@ def _handle_confirm(request):
         return _error("No images in confirm payload.")
 
     # ===== Upload images to Shopify =====
+    print(f"[Confirm] Uploading {len(images)} images to Shopify...")
     uploaded_media = []
     for img in images:
         img_bytes = base64.b64decode(img["base64"])
@@ -319,6 +301,7 @@ def _handle_confirm(request):
         return _error("Failed to upload images to Shopify.", 500)
 
     # ===== Create product =====
+    print(f"[Confirm] Creating product: {product_name}...")
     product_result = create_product(
         title=product_name,
         description_html=description_html,
@@ -336,17 +319,20 @@ def _handle_confirm(request):
 
     # ===== Assign to collections =====
     product_id = product_result.get("product_id")
+    assigned = []
     if product_id and collection_handles:
         for handle in collection_handles:
             col_id = get_collection_id_by_handle(handle)
             if col_id:
-                assign_to_collections(product_id, col_id)
+                if assign_to_collections(product_id, col_id):
+                    assigned.append(handle)
 
     # ===== Return success =====
     store_domain = os.environ.get("SHOPIFY_STORE", "udfphb-uk.myshopify.com")
     product_handle = product_result.get("handle", "")
     shopify_id = product_result.get("numeric_id", "")
 
+    print(f"[Confirm] Success: {product_name} → {product_handle}")
     return (
         json.dumps({
             "success": True,
@@ -356,7 +342,7 @@ def _handle_confirm(request):
             "admin_url": f"https://{store_domain}/admin/products/{shopify_id}",
             "images_uploaded": len(uploaded_media),
             "tags_count": len(tags),
-            "collections_assigned": collection_handles,
+            "collections_assigned": assigned,
         }),
         200,
         _cors_headers(),
