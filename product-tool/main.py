@@ -1,13 +1,15 @@
 """
-Pookie Style — AI Product Creation Tool (v2)
+Pookie Style — AI Product Creation Tool (v3)
 Google Cloud Function Entry Point
 
-Receives multipart form data (images + product details),
-runs AI pipeline (3 API calls total), creates Shopify product.
+Two-step flow:
+  Step 1 (preview):  Receives images + details -> runs AI pipeline -> returns preview JSON
+  Step 2 (confirm):  Receives confirmed preview data -> creates Shopify product
 
-Image Pipeline (cost-optimized):
-  Image 1 → Hero front shot (VTON + smart background based on dress style)
-  Image 2 → 3×2 collage grid (6 poses/styles in ONE single API call)
+Image Pipeline (cost-optimized, 3 API calls total):
+  1 OpenAI call  -> Text (name, description, tags, SEO, dress_style)
+  1 Replicate    -> Hero front shot (VTON + smart background)
+  1 Replicate    -> 3x2 collage grid (6 poses/styles in ONE call)
 """
 
 import functions_framework
@@ -25,230 +27,297 @@ from services.shopify_service import (
 )
 
 
-@functions_framework.http
-def create_product_handler(request):
-    """
-    HTTP Cloud Function entry point.
+def _cors_headers():
+    return {"Access-Control-Allow-Origin": "*"}
 
-    Expects multipart/form-data with:
-      - images: 1-3 product photos
-      - price: selling price (required)
-      - compare_at_price: original price (required)
-      - sizes: comma-separated size list (required)
-      - category: collection handle (optional)
-      - name: product name (optional)
-      - description: notes/description (optional)
-      - extra_prompt: custom styling/pose instruction (optional)
 
-    Returns JSON with product URL and admin URL.
-
-    Total API calls: 3 (1 OpenAI + 1 Replicate hero + 1 Replicate collage)
-    Total images uploaded to Shopify: 2
-    """
-
-    # --- CORS headers ---
-    if request.method == "OPTIONS":
-        headers = {
+def _cors_preflight():
+    return (
+        "",
+        204,
+        {
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "POST, OPTIONS",
             "Access-Control-Allow-Headers": "Content-Type",
             "Access-Control-Max-Age": "3600",
-        }
-        return ("", 204, headers)
+        },
+    )
 
-    cors_headers = {"Access-Control-Allow-Origin": "*"}
+
+def _error(msg, status=400):
+    return (json.dumps({"success": False, "error": msg}), status, _cors_headers())
+
+
+@functions_framework.http
+def create_product_handler(request):
+    """
+    HTTP Cloud Function entry point.
+    Routes to preview or confirm based on ?action= query param.
+
+    action=preview (default):
+      Input:  multipart/form-data with images, price, sizes, etc.
+      Output: JSON with AI-generated name, description, tags, generated image base64
+
+    action=confirm:
+      Input:  JSON body with confirmed product data + base64 images
+      Output: JSON with Shopify product URL
+    """
+    if request.method == "OPTIONS":
+        return _cors_preflight()
 
     try:
-        # --- Parse form data ---
-        files = request.files.getlist("images")
-        if not files:
-            return (
-                json.dumps({"error": "No images uploaded. At least 1 image is required."}),
-                400,
-                cors_headers,
-            )
-        if len(files) > 3:
-            return (
-                json.dumps({"error": "Maximum 3 images allowed."}),
-                400,
-                cors_headers,
-            )
+        action = request.args.get("action", "preview")
 
-        price = request.form.get("price")
-        compare_at_price = request.form.get("compare_at_price")
-        sizes = request.form.get("sizes", "")
-        category = request.form.get("category", "")
-        user_name = request.form.get("name", "")
-        user_description = request.form.get("description", "")
-        extra_prompt = request.form.get("extra_prompt", "")  # User custom styling/pose instruction
-
-        if not price or not compare_at_price:
-            return (
-                json.dumps({"error": "Price and compare-at price are required."}),
-                400,
-                cors_headers,
-            )
-
-        if not sizes:
-            return (
-                json.dumps({"error": "At least one size must be selected."}),
-                400,
-                cors_headers,
-            )
-
-        size_list = [s.strip() for s in sizes.split(",") if s.strip()]
-
-        # Read image bytes
-        raw_images = []
-        for f in files:
-            img_bytes = f.read()
-            raw_images.append(
-                {
-                    "bytes": img_bytes,
-                    "filename": f.filename,
-                    "content_type": f.content_type or "image/jpeg",
-                    "base64": base64.b64encode(img_bytes).decode("utf-8"),
-                }
-            )
-
-        primary_image = raw_images[0]
-
-        # ===== STEP 1: AI Text Generation (1 OpenAI call) =====
-        ai_result = analyze_and_generate_text(
-            images=raw_images,
-            user_name=user_name,
-            user_description=user_description,
-        )
-
-        product_name = user_name if user_name else ai_result.get("product_name", "New Product")
-        description_html = ai_result.get("description", "<p>Beautiful fashion product by Pookie Style.</p>")
-        tags = ai_result.get("tags", [])
-        seo_title = ai_result.get("seo_title", product_name)
-        seo_description = ai_result.get("seo_description", "")
-        detected_garment_type = ai_result.get("detected_garment_type", "")
-        suggested_collections = ai_result.get("suggested_collections", [])
-        # dress_style → "traditional" | "western" | "fusion" | "formal"
-        dress_style = ai_result.get("dress_style", "western").lower()
-
-        # ===== STEP 2: Image 1 — Hero Front Shot (1 Replicate call) =====
-        # Smart background auto-selected based on dress style
-        hero_bytes = virtual_tryon_hero(
-            garment_bytes=primary_image["bytes"],
-            dress_style=dress_style,
-            extra_prompt=extra_prompt,
-        )
-
-        # ===== STEP 3: Image 2 — 3×2 Collage Grid (1 Replicate call) =====
-        # Single API call generates all 6 poses/styles in one grid image
-        collage_bytes = virtual_tryon_collage_grid(
-            garment_bytes=primary_image["bytes"],
-            dress_style=dress_style,
-            extra_prompt=extra_prompt,
-        )
-
-        # ===== STEP 4: Upload to Shopify (2 images only) =====
-        processed_images = [
-            {
-                "bytes": hero_bytes,
-                "filename": "hero-front.jpg",
-                "alt": f"{product_name} - Front View",
-            },
-            {
-                "bytes": collage_bytes,
-                "filename": "poses-collage.jpg",
-                "alt": f"{product_name} - All Poses",
-            },
-        ]
-
-        # Filter out None (if an API call failed gracefully)
-        valid_images = [img for img in processed_images if img["bytes"] is not None]
-
-        # Fallback: use raw upload if all processing failed
-        if not valid_images:
-            valid_images = [
-                {"bytes": primary_image["bytes"], "filename": "original.jpg", "alt": product_name}
-            ]
-
-        uploaded_media = []
-        for img in valid_images:
-            media_id = upload_image_to_shopify(
-                image_bytes=img["bytes"],
-                filename=img["filename"],
-                alt_text=img["alt"],
-            )
-            if media_id:
-                uploaded_media.append(media_id)
-
-        # ===== STEP 5: Create Shopify Product =====
-        product_result = create_product(
-            title=product_name,
-            description_html=description_html,
-            product_type=detected_garment_type,
-            vendor="Pookie Style",
-            tags=tags,
-            sizes=size_list,
-            price=price,
-            compare_at_price=compare_at_price,
-            media_ids=uploaded_media,
-            seo_title=seo_title,
-            seo_description=seo_description,
-            status="DRAFT",
-        )
-
-        # ===== STEP 6: Assign Collections =====
-        collection_handles = []
-        if category:
-            collection_handles = [category]
-        elif suggested_collections:
-            collection_handles = suggested_collections[:3]
-
-        product_id = product_result.get("product_id")
-        if product_id and collection_handles:
-            for handle in collection_handles:
-                col_id = get_collection_id_by_handle(handle)
-                if col_id:
-                    assign_to_collections(product_id, col_id)
-
-        # ===== Return Success =====
-        store_domain = os.environ.get("SHOPIFY_STORE", "udfphb-uk.myshopify.com")
-        product_handle = product_result.get("handle", "")
-        shopify_id = product_result.get("numeric_id", "")
-
-        return (
-            json.dumps(
-                {
-                    "success": True,
-                    "product_name": product_name,
-                    "product_url": f"https://pookiestyle.in/products/{product_handle}",
-                    "admin_url": f"https://{store_domain}/admin/products/{shopify_id}",
-                    "images_uploaded": len(uploaded_media),
-                    "tags_count": len(tags),
-                    "collections_assigned": collection_handles,
-                    "dress_style": dress_style,
-                    "ai_analysis": {
-                        "garment_type": detected_garment_type,
-                        "dress_style": dress_style,
-                        "color": ai_result.get("detected_color", ""),
-                        "fabric": ai_result.get("detected_fabric", ""),
-                        "style": ai_result.get("detected_style", ""),
-                        "occasion": ai_result.get("detected_occasion", ""),
-                    },
-                }
-            ),
-            200,
-            cors_headers,
-        )
+        if action == "confirm":
+            return _handle_confirm(request)
+        else:
+            return _handle_preview(request)
 
     except Exception as e:
         traceback.print_exc()
         return (
-            json.dumps(
-                {
-                    "success": False,
-                    "error": str(e),
-                    "stage": "unknown",
-                }
-            ),
+            json.dumps({"success": False, "error": str(e), "stage": "unknown"}),
             500,
-            cors_headers,
+            _cors_headers(),
         )
+
+
+# ===========================================================================
+# STEP 1: PREVIEW — AI text + image generation, returns preview data
+# ===========================================================================
+def _handle_preview(request):
+    """
+    Processes images through AI pipeline and returns preview data.
+    Does NOT create a Shopify product — just returns what WOULD be created.
+    """
+    files = request.files.getlist("images")
+    if not files:
+        return _error("No images uploaded. At least 1 image is required.")
+    if len(files) > 3:
+        return _error("Maximum 3 images allowed.")
+
+    price = request.form.get("price")
+    compare_at_price = request.form.get("compare_at_price")
+    sizes = request.form.get("sizes", "")
+    category = request.form.get("category", "")
+    user_name = request.form.get("name", "")
+    user_description = request.form.get("description", "")
+    extra_prompt = request.form.get("extra_prompt", "")
+    use_my_description = request.form.get("use_my_description", "false") == "true"
+
+    if not price or not compare_at_price:
+        return _error("Price and compare-at price are required.")
+    if not sizes:
+        return _error("At least one size must be selected.")
+
+    size_list = [s.strip() for s in sizes.split(",") if s.strip()]
+
+    # Read image bytes
+    raw_images = []
+    for f in files:
+        img_bytes = f.read()
+        raw_images.append({
+            "bytes": img_bytes,
+            "filename": f.filename,
+            "content_type": f.content_type or "image/jpeg",
+            "base64": base64.b64encode(img_bytes).decode("utf-8"),
+        })
+
+    primary_image = raw_images[0]
+
+    # ===== STEP 1: AI Text Generation (1 OpenAI call) =====
+    # AI ALWAYS analyzes the image + user notes to generate name, description, tags
+    ai_result = analyze_and_generate_text(
+        images=raw_images,
+        user_name=user_name,
+        user_description=user_description,
+    )
+
+    # Product name: use AI-generated (incorporates user_name as a hint)
+    product_name = ai_result.get("product_name", user_name or "New Product")
+
+    # Description logic:
+    #   - AI always generates a description from image + user notes
+    #   - If user checked "use my description", we use their text as-is
+    #   - Both are sent in preview so user can switch in the preview screen
+    ai_description = ai_result.get("description", "<p>Beautiful fashion product by Pookie Style.</p>")
+    if use_my_description and user_description:
+        description_html = f"<p>{user_description}</p>"
+    else:
+        description_html = ai_description
+
+    tags = ai_result.get("tags", [])
+    seo_title = ai_result.get("seo_title", product_name)
+    seo_description = ai_result.get("seo_description", "")
+    detected_garment_type = ai_result.get("detected_garment_type", "")
+    suggested_collections = ai_result.get("suggested_collections", [])
+    dress_style = ai_result.get("dress_style", "western").lower()
+
+    # ===== STEP 2: Hero Image (1 Replicate call) =====
+    hero_bytes = virtual_tryon_hero(
+        garment_bytes=primary_image["bytes"],
+        dress_style=dress_style,
+        extra_prompt=extra_prompt,
+    )
+
+    # ===== STEP 3: Collage Grid (1 Replicate call) =====
+    collage_bytes = virtual_tryon_collage_grid(
+        garment_bytes=primary_image["bytes"],
+        dress_style=dress_style,
+        extra_prompt=extra_prompt,
+    )
+
+    # Build image data for preview (base64 for display in browser)
+    preview_images = []
+    if hero_bytes:
+        preview_images.append({
+            "label": "Hero - Front View",
+            "base64": base64.b64encode(hero_bytes).decode("utf-8"),
+            "filename": "hero-front.jpg",
+        })
+    if collage_bytes:
+        preview_images.append({
+            "label": "6-Pose Collage Grid",
+            "base64": base64.b64encode(collage_bytes).decode("utf-8"),
+            "filename": "poses-collage.jpg",
+        })
+
+    # Fallback: if both image generations failed, include the raw uploaded photo
+    if not preview_images:
+        preview_images.append({
+            "label": "Original Upload (AI generation unavailable)",
+            "base64": primary_image["base64"],
+            "filename": "original.jpg",
+        })
+
+    # Determine collections
+    collection_handles = []
+    if category:
+        collection_handles = [category]
+    elif suggested_collections:
+        collection_handles = suggested_collections[:3]
+
+    # ===== Return preview (NOT yet created on Shopify) =====
+    return (
+        json.dumps({
+            "success": True,
+            "action": "preview",
+            "preview": {
+                "product_name": product_name,
+                "description_html": description_html,
+                "tags": tags,
+                "seo_title": seo_title,
+                "seo_description": seo_description,
+                "product_type": detected_garment_type,
+                "dress_style": dress_style,
+                "sizes": size_list,
+                "price": price,
+                "compare_at_price": compare_at_price,
+                "collections": collection_handles,
+                "images": preview_images,
+                "ai_analysis": {
+                    "garment_type": detected_garment_type,
+                    "dress_style": dress_style,
+                    "color": ai_result.get("detected_color", ""),
+                    "fabric": ai_result.get("detected_fabric", ""),
+                    "style": ai_result.get("detected_style", ""),
+                    "occasion": ai_result.get("detected_occasion", ""),
+                },
+                # Always include AI-generated alternatives so user can switch
+                "ai_description": ai_description,
+                "ai_product_name": ai_result.get("product_name", ""),
+            },
+        }),
+        200,
+        _cors_headers(),
+    )
+
+
+# ===========================================================================
+# STEP 2: CONFIRM — Takes preview data and creates the Shopify product
+# ===========================================================================
+def _handle_confirm(request):
+    """
+    Creates the Shopify product from confirmed preview data.
+    Expects JSON body with the full product payload (including base64 images).
+    """
+    data = request.get_json(force=True)
+    if not data:
+        return _error("No data provided.")
+
+    product_name = data.get("product_name", "New Product")
+    description_html = data.get("description_html", "<p></p>")
+    tags = data.get("tags", [])
+    seo_title = data.get("seo_title", product_name)
+    seo_description = data.get("seo_description", "")
+    product_type = data.get("product_type", "")
+    sizes = data.get("sizes", ["Free Size"])
+    price = data.get("price", "0")
+    compare_at_price = data.get("compare_at_price", "0")
+    collection_handles = data.get("collections", [])
+    images = data.get("images", [])
+
+    if not images:
+        return _error("No images in confirm payload.")
+
+    # ===== Upload images to Shopify =====
+    uploaded_media = []
+    for img in images:
+        img_bytes = base64.b64decode(img["base64"])
+        filename = img.get("filename", "product.jpg")
+        alt_text = img.get("label", product_name)
+
+        media_id = upload_image_to_shopify(
+            image_bytes=img_bytes,
+            filename=filename,
+            alt_text=alt_text,
+        )
+        if media_id:
+            uploaded_media.append(media_id)
+
+    if not uploaded_media:
+        return _error("Failed to upload images to Shopify.", 500)
+
+    # ===== Create product =====
+    product_result = create_product(
+        title=product_name,
+        description_html=description_html,
+        product_type=product_type,
+        vendor="Pookie Style",
+        tags=tags,
+        sizes=sizes,
+        price=price,
+        compare_at_price=compare_at_price,
+        media_ids=uploaded_media,
+        seo_title=seo_title,
+        seo_description=seo_description,
+        status="DRAFT",
+    )
+
+    # ===== Assign to collections =====
+    product_id = product_result.get("product_id")
+    if product_id and collection_handles:
+        for handle in collection_handles:
+            col_id = get_collection_id_by_handle(handle)
+            if col_id:
+                assign_to_collections(product_id, col_id)
+
+    # ===== Return success =====
+    store_domain = os.environ.get("SHOPIFY_STORE", "udfphb-uk.myshopify.com")
+    product_handle = product_result.get("handle", "")
+    shopify_id = product_result.get("numeric_id", "")
+
+    return (
+        json.dumps({
+            "success": True,
+            "action": "confirmed",
+            "product_name": product_name,
+            "product_url": f"https://pookiestyle.in/products/{product_handle}",
+            "admin_url": f"https://{store_domain}/admin/products/{shopify_id}",
+            "images_uploaded": len(uploaded_media),
+            "tags_count": len(tags),
+            "collections_assigned": collection_handles,
+        }),
+        200,
+        _cors_headers(),
+    )

@@ -1,7 +1,7 @@
 {% comment %}
-  Pookie Style — AI Product Creator
-  Admin-only page section for creating products from phone photos.
-  This page should be hidden from the storefront (Shopify Admin → Pages → Visibility: Hidden).
+  Pookie Style — AI Product Creator (v3)
+  Two-step flow: Upload → Preview → Confirm
+  Admin-only page section.
 {% endcomment %}
 
 {{ 'pookie-product-creator.css' | asset_url | stylesheet_tag }}
@@ -13,13 +13,14 @@
       <p class="pookie-creator__subtitle">{{ section.settings.subheading }}</p>
     </header>
 
+    {%- comment -%} ========== SCREEN 1: UPLOAD FORM ========== {%- endcomment -%}
     <form id="pookie-creator-form" class="pookie-creator__form" enctype="multipart/form-data">
       {%- comment -%} Image Upload {%- endcomment -%}
       <div class="pookie-creator__field">
         <label class="pookie-creator__label">
           Product Photos <span class="pookie-creator__required">*</span>
         </label>
-        <p class="pookie-creator__hint">Upload 1–3 photos (phone camera, hanger, flat-lay, mannequin)</p>
+        <p class="pookie-creator__hint">Upload 1-3 photos (phone camera, hanger, flat-lay, mannequin)</p>
         <div id="pookie-dropzone" class="pookie-creator__dropzone">
           <div class="pookie-creator__dropzone-content">
             <svg class="pookie-creator__upload-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -76,6 +77,10 @@
       <div class="pookie-creator__field">
         <label class="pookie-creator__label" for="pookie-description">Description / Notes <span class="pookie-creator__optional">(optional — AI uses to generate listing)</span></label>
         <textarea id="pookie-description" name="description" class="pookie-creator__textarea" rows="3" placeholder="Any details: fabric, occasion, special features..."></textarea>
+        <label class="pookie-creator__checkbox-label" style="margin-top:8px;">
+          <input type="checkbox" id="pookie-use-my-desc" name="use_my_description" value="true" />
+          <span>Use my description as-is (skip AI rewrite)</span>
+        </label>
       </div>
 
       <div class="pookie-creator__field">
@@ -123,18 +128,17 @@
 
       {%- comment -%} Extra Styling Prompt {%- endcomment -%}
       <div class="pookie-creator__field">
-        <label class="pookie-creator__label" for="pookie-extra-prompt">Styling / Pose Instructions <span class="pookie-creator__optional">(optional — guide the AI for image generation)</span></label>
+        <label class="pookie-creator__label" for="pookie-extra-prompt">Styling / Pose Instructions <span class="pookie-creator__optional">(optional)</span></label>
         <textarea id="pookie-extra-prompt" name="extra_prompt" class="pookie-creator__textarea" rows="2" placeholder="e.g., Show with traditional Indian poses, add floral accessories, evening party vibe..."></textarea>
       </div>
 
-      {%- comment -%} Submit {%- endcomment -%}
       <button type="submit" id="pookie-submit" class="pookie-creator__submit">
-        <span class="pookie-creator__submit-text">🚀 Create Product</span>
+        <span class="pookie-creator__submit-text">Generate Preview</span>
         <span class="pookie-creator__submit-loading" style="display:none;">Processing...</span>
       </button>
     </form>
 
-    {%- comment -%} Progress Indicator {%- endcomment -%}
+    {%- comment -%} ========== PROGRESS INDICATOR ========== {%- endcomment -%}
     <div id="pookie-progress" class="pookie-creator__progress" style="display:none;">
       <div class="pookie-creator__progress-bar">
         <div id="pookie-progress-fill" class="pookie-creator__progress-fill" style="width:0%"></div>
@@ -142,22 +146,79 @@
       <p id="pookie-progress-text" class="pookie-creator__progress-text">Starting...</p>
     </div>
 
-    {%- comment -%} Success Message {%- endcomment -%}
+    {%- comment -%} ========== SCREEN 2: PREVIEW ========== {%- endcomment -%}
+    <div id="pookie-preview-screen" class="pookie-creator__preview-screen" style="display:none;">
+      <h2 style="text-align:center;margin-bottom:4px;">Preview — Review Before Creating</h2>
+      <p style="text-align:center;color:#888;margin-bottom:24px;font-size:14px;">Review everything below. Edit the name or description if needed, then click "Create Product".</p>
+
+      {%- comment -%} Generated Images {%- endcomment -%}
+      <div class="pookie-creator__field">
+        <label class="pookie-creator__label">Generated Images</label>
+        <div id="pookie-preview-images" class="pookie-creator__preview-images" style="display:flex;gap:16px;flex-wrap:wrap;"></div>
+      </div>
+
+      {%- comment -%} Product Name (editable) {%- endcomment -%}
+      <div class="pookie-creator__field">
+        <label class="pookie-creator__label" for="pookie-preview-name">Product Name</label>
+        <input type="text" id="pookie-preview-name" class="pookie-creator__input" />
+      </div>
+
+      {%- comment -%} Description (editable, with toggle) {%- endcomment -%}
+      <div class="pookie-creator__field">
+        <label class="pookie-creator__label">Description</label>
+        <div id="pookie-preview-desc-toggle" style="margin-bottom:8px;display:flex;gap:12px;">
+          <button type="button" id="pookie-desc-ai-btn" class="pookie-creator__toggle-btn pookie-creator__toggle-btn--active" onclick="window.__pookieUseAIDesc()">AI Generated</button>
+          <button type="button" id="pookie-desc-my-btn" class="pookie-creator__toggle-btn" onclick="window.__pookieUseMyDesc()">My Description</button>
+        </div>
+        <div id="pookie-preview-desc-html" class="pookie-creator__desc-preview" style="background:#fafafa;padding:16px;border-radius:8px;border:1px solid #eee;min-height:60px;"></div>
+        <textarea id="pookie-preview-desc-edit" class="pookie-creator__textarea" rows="4" style="display:none;margin-top:8px;"></textarea>
+        <label class="pookie-creator__checkbox-label" style="margin-top:8px;">
+          <input type="checkbox" id="pookie-preview-desc-edit-toggle" onchange="window.__pookieToggleDescEdit(this.checked)" />
+          <span>Edit description manually</span>
+        </label>
+      </div>
+
+      {%- comment -%} Tags {%- endcomment -%}
+      <div class="pookie-creator__field">
+        <label class="pookie-creator__label">Tags <span style="color:#888;font-weight:normal;">(<span id="pookie-preview-tag-count">0</span> tags)</span></label>
+        <div id="pookie-preview-tags" class="pookie-creator__tags-preview" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+      </div>
+
+      {%- comment -%} AI Analysis {%- endcomment -%}
+      <div class="pookie-creator__field">
+        <label class="pookie-creator__label">AI Analysis</label>
+        <div id="pookie-preview-analysis" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:14px;"></div>
+      </div>
+
+      {%- comment -%} Price / Size / Collection summary {%- endcomment -%}
+      <div class="pookie-creator__field">
+        <label class="pookie-creator__label">Product Details</label>
+        <div id="pookie-preview-details" style="font-size:14px;line-height:1.8;"></div>
+      </div>
+
+      {%- comment -%} Action Buttons {%- endcomment -%}
+      <div style="display:flex;gap:12px;margin-top:24px;">
+        <button type="button" id="pookie-back-btn" class="pookie-creator__submit" style="background:#666;" onclick="window.__pookieBackToForm()">Back to Edit</button>
+        <button type="button" id="pookie-confirm-btn" class="pookie-creator__submit" onclick="window.__pookieConfirm()">Create Product on Shopify</button>
+      </div>
+    </div>
+
+    {%- comment -%} ========== SCREEN 3: SUCCESS ========== {%- endcomment -%}
     <div id="pookie-success" class="pookie-creator__success" style="display:none;">
-      <div class="pookie-creator__success-icon">✅</div>
+      <div class="pookie-creator__success-icon">&#x2705;</div>
       <h2>Product Created Successfully!</h2>
       <p id="pookie-success-name" class="pookie-creator__success-name"></p>
       <div class="pookie-creator__success-links">
-        <a id="pookie-admin-link" href="#" target="_blank" class="pookie-creator__link pookie-creator__link--admin">View in Shopify Admin →</a>
-        <a id="pookie-store-link" href="#" target="_blank" class="pookie-creator__link pookie-creator__link--store">View on Store →</a>
+        <a id="pookie-admin-link" href="#" target="_blank" class="pookie-creator__link pookie-creator__link--admin">View in Shopify Admin &rarr;</a>
+        <a id="pookie-store-link" href="#" target="_blank" class="pookie-creator__link pookie-creator__link--store">View on Store &rarr;</a>
       </div>
       <div id="pookie-success-details" class="pookie-creator__success-details"></div>
       <button id="pookie-create-another" class="pookie-creator__submit pookie-creator__submit--another">Create Another Product</button>
     </div>
 
-    {%- comment -%} Error Message {%- endcomment -%}
+    {%- comment -%} ========== ERROR MESSAGE ========== {%- endcomment -%}
     <div id="pookie-error" class="pookie-creator__error" style="display:none;">
-      <div class="pookie-creator__error-icon">❌</div>
+      <div class="pookie-creator__error-icon">&#x274C;</div>
       <h2>Something went wrong</h2>
       <p id="pookie-error-text"></p>
       <button id="pookie-retry" class="pookie-creator__submit">Try Again</button>
@@ -165,202 +226,365 @@
   </div>
 </section>
 
+<style>
+  .pookie-creator__toggle-btn {
+    padding: 6px 16px; border-radius: 20px; border: 1px solid #ddd;
+    background: #fff; cursor: pointer; font-size: 13px; transition: all .2s;
+  }
+  .pookie-creator__toggle-btn--active {
+    background: #111; color: #fff; border-color: #111;
+  }
+  .pookie-creator__tags-preview .tag-chip {
+    background: #f3f3f3; padding: 4px 10px; border-radius: 12px;
+    font-size: 12px; color: #444;
+  }
+  .pookie-creator__preview-images img {
+    max-width: 300px; border-radius: 8px; border: 1px solid #eee;
+  }
+  .pookie-creator__preview-images .img-wrap {
+    text-align: center;
+  }
+  .pookie-creator__preview-images .img-label {
+    font-size: 12px; color: #888; margin-top: 4px;
+  }
+  .pookie-creator__checkbox-label {
+    display: flex; align-items: center; gap: 8px; font-size: 14px; color: #555; cursor: pointer;
+  }
+  .pookie-creator__checkbox-label input[type="checkbox"] {
+    width: 16px; height: 16px; accent-color: #111;
+  }
+  .pookie-creator__desc-preview { font-size: 14px; line-height: 1.6; color: #333; }
+</style>
+
 <script>
-  (function() {
-    'use strict';
+(function() {
+  'use strict';
 
-    var BACKEND_URL = '{{ section.settings.backend_url }}' || 'https://asia-south1-pookie-style-automation.cloudfunctions.net/create-product';
-    var form = document.getElementById('pookie-creator-form');
-    var fileInput = document.getElementById('pookie-images');
-    var dropzone = document.getElementById('pookie-dropzone');
-    var previews = document.getElementById('pookie-previews');
-    var submitBtn = document.getElementById('pookie-submit');
-    var progressDiv = document.getElementById('pookie-progress');
-    var progressFill = document.getElementById('pookie-progress-fill');
-    var progressText = document.getElementById('pookie-progress-text');
-    var successDiv = document.getElementById('pookie-success');
-    var errorDiv = document.getElementById('pookie-error');
-    var selectedFiles = [];
+  var BACKEND_URL = '{{ section.settings.backend_url }}' || 'https://asia-south1-pookie-style-automation.cloudfunctions.net/create-product';
+  var form = document.getElementById('pookie-creator-form');
+  var fileInput = document.getElementById('pookie-images');
+  var dropzone = document.getElementById('pookie-dropzone');
+  var previews = document.getElementById('pookie-previews');
+  var progressDiv = document.getElementById('pookie-progress');
+  var progressFill = document.getElementById('pookie-progress-fill');
+  var progressText = document.getElementById('pookie-progress-text');
+  var previewScreen = document.getElementById('pookie-preview-screen');
+  var successDiv = document.getElementById('pookie-success');
+  var errorDiv = document.getElementById('pookie-error');
+  var selectedFiles = [];
+  var previewData = null; /* Stores backend response for confirm step */
 
-    /* --- Drag & Drop --- */
-    dropzone.addEventListener('click', function(e) {
-      if (e.target === fileInput) return;
-      fileInput.click();
-    });
-    dropzone.addEventListener('dragover', function(e) {
-      e.preventDefault();
-      dropzone.classList.add('pookie-creator__dropzone--active');
-    });
-    dropzone.addEventListener('dragleave', function() {
-      dropzone.classList.remove('pookie-creator__dropzone--active');
-    });
-    dropzone.addEventListener('drop', function(e) {
-      e.preventDefault();
-      dropzone.classList.remove('pookie-creator__dropzone--active');
-      handleFiles(e.dataTransfer.files);
-    });
-    fileInput.addEventListener('change', function() {
-      handleFiles(fileInput.files);
-    });
+  /* --- Drag & Drop --- */
+  dropzone.addEventListener('click', function(e) {
+    if (e.target === fileInput) return;
+    fileInput.click();
+  });
+  dropzone.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    dropzone.classList.add('pookie-creator__dropzone--active');
+  });
+  dropzone.addEventListener('dragleave', function() {
+    dropzone.classList.remove('pookie-creator__dropzone--active');
+  });
+  dropzone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    dropzone.classList.remove('pookie-creator__dropzone--active');
+    handleFiles(e.dataTransfer.files);
+  });
+  fileInput.addEventListener('change', function() { handleFiles(fileInput.files); });
 
-    function handleFiles(files) {
-      var newFiles = Array.from(files).slice(0, 3 - selectedFiles.length);
-      newFiles.forEach(function(file) {
-        if (selectedFiles.length >= 3) return;
-        if (file.size > 10 * 1024 * 1024) {
-          alert(file.name + ' is larger than 10 MB. Please use a smaller image.');
-          return;
-        }
-        selectedFiles.push(file);
+  function handleFiles(files) {
+    var newFiles = Array.from(files).slice(0, 3 - selectedFiles.length);
+    newFiles.forEach(function(file) {
+      if (selectedFiles.length >= 3) return;
+      if (file.size > 10 * 1024 * 1024) {
+        alert(file.name + ' is larger than 10 MB.');
+        return;
+      }
+      selectedFiles.push(file);
+    });
+    renderPreviews();
+  }
+
+  function renderPreviews() {
+    previews.innerHTML = '';
+    selectedFiles.forEach(function(file, idx) {
+      var wrap = document.createElement('div');
+      wrap.className = 'pookie-creator__preview';
+      var img = document.createElement('img');
+      img.src = URL.createObjectURL(file);
+      img.alt = 'Preview ' + (idx + 1);
+      var removeBtn = document.createElement('button');
+      removeBtn.className = 'pookie-creator__preview-remove';
+      removeBtn.textContent = '\u00d7';
+      removeBtn.type = 'button';
+      removeBtn.addEventListener('click', function() {
+        selectedFiles.splice(idx, 1);
+        renderPreviews();
       });
-      renderPreviews();
-    }
+      wrap.appendChild(img);
+      wrap.appendChild(removeBtn);
+      previews.appendChild(wrap);
+    });
+  }
 
-    function renderPreviews() {
-      previews.innerHTML = '';
-      selectedFiles.forEach(function(file, idx) {
-        var wrap = document.createElement('div');
-        wrap.className = 'pookie-creator__preview';
-        var img = document.createElement('img');
-        img.src = URL.createObjectURL(file);
-        img.alt = 'Preview ' + (idx + 1);
-        var removeBtn = document.createElement('button');
-        removeBtn.className = 'pookie-creator__preview-remove';
-        removeBtn.textContent = '×';
-        removeBtn.type = 'button';
-        removeBtn.addEventListener('click', function() {
-          selectedFiles.splice(idx, 1);
-          renderPreviews();
-        });
-        wrap.appendChild(img);
-        wrap.appendChild(removeBtn);
-        previews.appendChild(wrap);
-      });
-    }
+  /* --- Progress Animation --- */
+  var progressSteps = [
+    { pct: 10, text: 'Uploading images...' },
+    { pct: 25, text: 'AI analyzing product photos...' },
+    { pct: 40, text: 'Generating product name, description & tags...' },
+    { pct: 55, text: 'Creating hero image with model...' },
+    { pct: 70, text: 'Generating 6-pose collage grid...' },
+    { pct: 85, text: 'Preparing preview...' },
+  ];
 
-    /* --- Progress Animation --- */
-    var progressSteps = [
-      { pct: 10, text: 'Uploading images...' },
-      { pct: 25, text: 'Analyzing product with AI...' },
-      { pct: 45, text: 'Generating hero image (front view)...' },
-      { pct: 65, text: 'Creating 6-pose collage grid...' },
-      { pct: 80, text: 'Uploading images to Shopify...' },
-      { pct: 90, text: 'Creating product & assigning tags...' },
-    ];
+  function animateProgress() {
+    var i = 0;
+    var interval = setInterval(function() {
+      if (i >= progressSteps.length) { clearInterval(interval); return; }
+      progressFill.style.width = progressSteps[i].pct + '%';
+      progressText.textContent = progressSteps[i].text;
+      i++;
+    }, 12000);
+    return interval;
+  }
 
-    function animateProgress() {
-      var i = 0;
-      var interval = setInterval(function() {
-        if (i >= progressSteps.length) { clearInterval(interval); return; }
-        progressFill.style.width = progressSteps[i].pct + '%';
-        progressText.textContent = progressSteps[i].text;
-        i++;
-      }, 14000); /* ~14 sec per step ≈ 84 sec total for 6 steps */
-      return interval;
-    }
+  /* --- SCREEN MANAGEMENT --- */
+  function showScreen(screen) {
+    form.style.display = screen === 'form' ? 'block' : 'none';
+    progressDiv.style.display = screen === 'progress' ? 'block' : 'none';
+    previewScreen.style.display = screen === 'preview' ? 'block' : 'none';
+    successDiv.style.display = screen === 'success' ? 'block' : 'none';
+    errorDiv.style.display = screen === 'error' ? 'block' : 'none';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
 
-    /* --- Form Submit --- */
-    form.addEventListener('submit', function(e) {
-      e.preventDefault();
+  /* --- STEP 1: SUBMIT FORM → GET PREVIEW --- */
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    if (selectedFiles.length === 0) { alert('Please upload at least 1 photo.'); return; }
+    var checkedSizes = form.querySelectorAll('input[name="sizes"]:checked');
+    if (checkedSizes.length === 0) { alert('Please select at least one size.'); return; }
+    if (!BACKEND_URL) { alert('Backend URL not configured.'); return; }
 
-      if (selectedFiles.length === 0) {
-        alert('Please upload at least 1 product photo.');
-        return;
-      }
+    var sizes = [];
+    checkedSizes.forEach(function(cb) { sizes.push(cb.value); });
 
-      var checkedSizes = form.querySelectorAll('input[name="sizes"]:checked');
-      if (checkedSizes.length === 0) {
-        alert('Please select at least one size.');
-        return;
-      }
+    var fd = new FormData();
+    selectedFiles.forEach(function(f) { fd.append('images', f); });
+    fd.append('price', form.querySelector('#pookie-price').value);
+    fd.append('compare_at_price', form.querySelector('#pookie-compare-price').value);
+    fd.append('sizes', sizes.join(','));
+    fd.append('name', form.querySelector('#pookie-name').value);
+    fd.append('description', form.querySelector('#pookie-description').value);
+    fd.append('category', form.querySelector('#pookie-category').value);
+    fd.append('extra_prompt', form.querySelector('#pookie-extra-prompt').value);
+    fd.append('use_my_description', document.getElementById('pookie-use-my-desc').checked ? 'true' : 'false');
 
-      if (!BACKEND_URL) {
-        alert('Backend URL not configured. Please set it in the theme editor.');
-        return;
-      }
+    showScreen('progress');
+    progressFill.style.width = '5%';
+    progressText.textContent = 'Starting...';
+    var progressInterval = animateProgress();
 
-      /* Collect sizes */
-      var sizes = [];
-      checkedSizes.forEach(function(cb) { sizes.push(cb.value); });
-
-      /* Build FormData */
-      var fd = new FormData();
-      selectedFiles.forEach(function(f) { fd.append('images', f); });
-      fd.append('price', form.querySelector('#pookie-price').value);
-      fd.append('compare_at_price', form.querySelector('#pookie-compare-price').value);
-      fd.append('sizes', sizes.join(','));
-      fd.append('name', form.querySelector('#pookie-name').value);
-      fd.append('description', form.querySelector('#pookie-description').value);
-      fd.append('category', form.querySelector('#pookie-category').value);
-      fd.append('extra_prompt', form.querySelector('#pookie-extra-prompt').value);
-
-      /* Show progress */
-      form.style.display = 'none';
-      successDiv.style.display = 'none';
-      errorDiv.style.display = 'none';
-      progressDiv.style.display = 'block';
-      progressFill.style.width = '5%';
-      progressText.textContent = 'Starting...';
-      var progressInterval = animateProgress();
-
-      /* Send to backend */
-      fetch(BACKEND_URL, {
-        method: 'POST',
-        body: fd,
-      })
+    fetch(BACKEND_URL + '?action=preview', { method: 'POST', body: fd })
       .then(function(res) { return res.json(); })
       .then(function(data) {
         clearInterval(progressInterval);
-        progressDiv.style.display = 'none';
-
-        if (data.success) {
-          progressFill.style.width = '100%';
-          successDiv.style.display = 'block';
-          document.getElementById('pookie-success-name').textContent = data.product_name || 'Product';
-          document.getElementById('pookie-admin-link').href = data.admin_url || '#';
-          document.getElementById('pookie-store-link').href = data.product_url || '#';
-
-          var details = '';
-          if (data.images_uploaded) details += '📸 ' + data.images_uploaded + ' images uploaded<br>';
-          if (data.tags_count) details += '🏷️ ' + data.tags_count + ' tags generated<br>';
-          if (data.collections_assigned && data.collections_assigned.length)
-            details += '📁 Added to: ' + data.collections_assigned.join(', ') + '<br>';
-          if (data.ai_analysis) {
-            var ai = data.ai_analysis;
-            if (ai.garment_type) details += '👗 Type: ' + ai.garment_type + '<br>';
-            if (ai.color) details += '🎨 Color: ' + ai.color + '<br>';
-            if (ai.fabric) details += '🧵 Fabric: ' + ai.fabric + '<br>';
-            if (ai.dress_style) details += '👠 Style: ' + ai.dress_style + '<br>';
-          }
-          document.getElementById('pookie-success-details').innerHTML = details;
+        if (data.success && data.preview) {
+          previewData = data.preview;
+          renderPreviewScreen(data.preview);
+          showScreen('preview');
         } else {
-          errorDiv.style.display = 'block';
-          document.getElementById('pookie-error-text').textContent = data.error || 'Unknown error occurred.';
+          showScreen('error');
+          document.getElementById('pookie-error-text').textContent = data.error || 'Unknown error.';
         }
       })
       .catch(function(err) {
         clearInterval(progressInterval);
-        progressDiv.style.display = 'none';
-        errorDiv.style.display = 'block';
+        showScreen('error');
         document.getElementById('pookie-error-text').textContent = 'Network error: ' + err.message;
       });
+  });
+
+  /* --- RENDER PREVIEW SCREEN --- */
+  function renderPreviewScreen(p) {
+    /* Images */
+    var imgContainer = document.getElementById('pookie-preview-images');
+    imgContainer.innerHTML = '';
+    (p.images || []).forEach(function(img) {
+      var wrap = document.createElement('div');
+      wrap.className = 'img-wrap';
+      var el = document.createElement('img');
+      el.src = 'data:image/jpeg;base64,' + img.base64;
+      el.alt = img.label;
+      var lbl = document.createElement('div');
+      lbl.className = 'img-label';
+      lbl.textContent = img.label;
+      wrap.appendChild(el);
+      wrap.appendChild(lbl);
+      imgContainer.appendChild(wrap);
     });
 
-    /* --- Create Another --- */
-    document.getElementById('pookie-create-another').addEventListener('click', function() {
-      successDiv.style.display = 'none';
-      form.style.display = 'block';
-      form.reset();
-      selectedFiles = [];
-      previews.innerHTML = '';
+    /* Name */
+    document.getElementById('pookie-preview-name').value = p.product_name || '';
+
+    /* Description */
+    window.__pookieAIDesc = p.ai_description || p.description_html || '';
+    window.__pookieMyDesc = document.getElementById('pookie-description').value || '';
+    document.getElementById('pookie-preview-desc-html').innerHTML = p.description_html || '';
+    document.getElementById('pookie-preview-desc-edit').value = p.description_html || '';
+    /* Reset toggle */
+    document.getElementById('pookie-desc-ai-btn').classList.add('pookie-creator__toggle-btn--active');
+    document.getElementById('pookie-desc-my-btn').classList.remove('pookie-creator__toggle-btn--active');
+    document.getElementById('pookie-preview-desc-edit-toggle').checked = false;
+    document.getElementById('pookie-preview-desc-edit').style.display = 'none';
+
+    /* Tags */
+    var tagsDiv = document.getElementById('pookie-preview-tags');
+    tagsDiv.innerHTML = '';
+    var tags = p.tags || [];
+    tags.forEach(function(tag) {
+      var chip = document.createElement('span');
+      chip.className = 'tag-chip';
+      chip.textContent = tag;
+      tagsDiv.appendChild(chip);
+    });
+    document.getElementById('pookie-preview-tag-count').textContent = tags.length;
+
+    /* AI Analysis */
+    var analysisDiv = document.getElementById('pookie-preview-analysis');
+    var ai = p.ai_analysis || {};
+    analysisDiv.innerHTML = '';
+    var fields = [
+      ['Type', ai.garment_type], ['Color', ai.color],
+      ['Fabric', ai.fabric], ['Style', ai.dress_style],
+      ['Occasion', ai.occasion]
+    ];
+    fields.forEach(function(f) {
+      if (f[1]) {
+        analysisDiv.innerHTML += '<div><strong>' + f[0] + ':</strong> ' + f[1] + '</div>';
+      }
     });
 
-    /* --- Retry --- */
-    document.getElementById('pookie-retry').addEventListener('click', function() {
-      errorDiv.style.display = 'none';
-      form.style.display = 'block';
-    });
-  })();
+    /* Details summary */
+    var detailsDiv = document.getElementById('pookie-preview-details');
+    detailsDiv.innerHTML =
+      '<strong>Price:</strong> &#x20B9;' + p.price + ' <span style="color:#888;text-decoration:line-through;">&#x20B9;' + p.compare_at_price + '</span><br>' +
+      '<strong>Sizes:</strong> ' + (p.sizes || []).join(', ') + '<br>' +
+      '<strong>Collections:</strong> ' + (p.collections && p.collections.length ? p.collections.join(', ') : 'None') + '<br>' +
+      '<strong>SEO Title:</strong> ' + (p.seo_title || '') + '<br>' +
+      '<strong>Meta:</strong> ' + (p.seo_description || '');
+  }
+
+  /* --- Description toggle helpers (exposed on window for onclick) --- */
+  window.__pookieUseAIDesc = function() {
+    document.getElementById('pookie-preview-desc-html').innerHTML = window.__pookieAIDesc;
+    document.getElementById('pookie-preview-desc-edit').value = window.__pookieAIDesc;
+    document.getElementById('pookie-desc-ai-btn').classList.add('pookie-creator__toggle-btn--active');
+    document.getElementById('pookie-desc-my-btn').classList.remove('pookie-creator__toggle-btn--active');
+  };
+  window.__pookieUseMyDesc = function() {
+    var myText = window.__pookieMyDesc || '';
+    var html = '<p>' + myText + '</p>';
+    document.getElementById('pookie-preview-desc-html').innerHTML = html;
+    document.getElementById('pookie-preview-desc-edit').value = html;
+    document.getElementById('pookie-desc-ai-btn').classList.remove('pookie-creator__toggle-btn--active');
+    document.getElementById('pookie-desc-my-btn').classList.add('pookie-creator__toggle-btn--active');
+  };
+  window.__pookieToggleDescEdit = function(checked) {
+    var htmlDiv = document.getElementById('pookie-preview-desc-html');
+    var editArea = document.getElementById('pookie-preview-desc-edit');
+    if (checked) {
+      editArea.value = htmlDiv.innerHTML;
+      editArea.style.display = 'block';
+      htmlDiv.style.display = 'none';
+    } else {
+      htmlDiv.innerHTML = editArea.value;
+      editArea.style.display = 'none';
+      htmlDiv.style.display = 'block';
+    }
+  };
+
+  /* --- BACK TO FORM --- */
+  window.__pookieBackToForm = function() {
+    showScreen('form');
+  };
+
+  /* --- STEP 2: CONFIRM → CREATE ON SHOPIFY --- */
+  window.__pookieConfirm = function() {
+    if (!previewData) { alert('No preview data.'); return; }
+
+    var confirmBtn = document.getElementById('pookie-confirm-btn');
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Creating on Shopify...';
+
+    /* Pick final description: either from edit textarea or from rendered HTML */
+    var editArea = document.getElementById('pookie-preview-desc-edit');
+    var htmlDiv = document.getElementById('pookie-preview-desc-html');
+    var finalDesc = editArea.style.display !== 'none' ? editArea.value : htmlDiv.innerHTML;
+
+    var payload = {
+      product_name: document.getElementById('pookie-preview-name').value || previewData.product_name,
+      description_html: finalDesc,
+      tags: previewData.tags,
+      seo_title: previewData.seo_title,
+      seo_description: previewData.seo_description,
+      product_type: previewData.product_type,
+      sizes: previewData.sizes,
+      price: previewData.price,
+      compare_at_price: previewData.compare_at_price,
+      collections: previewData.collections,
+      images: previewData.images,
+    };
+
+    fetch(BACKEND_URL + '?action=confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Create Product on Shopify';
+
+        if (data.success) {
+          showScreen('success');
+          document.getElementById('pookie-success-name').textContent = data.product_name || 'Product';
+          document.getElementById('pookie-admin-link').href = data.admin_url || '#';
+          document.getElementById('pookie-store-link').href = data.product_url || '#';
+          var details = '';
+          if (data.images_uploaded) details += 'Images: ' + data.images_uploaded + '<br>';
+          if (data.tags_count) details += 'Tags: ' + data.tags_count + '<br>';
+          if (data.collections_assigned && data.collections_assigned.length)
+            details += 'Collections: ' + data.collections_assigned.join(', ') + '<br>';
+          document.getElementById('pookie-success-details').innerHTML = details;
+        } else {
+          showScreen('error');
+          document.getElementById('pookie-error-text').textContent = data.error || 'Unknown error.';
+        }
+      })
+      .catch(function(err) {
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Create Product on Shopify';
+        showScreen('error');
+        document.getElementById('pookie-error-text').textContent = 'Network error: ' + err.message;
+      });
+  };
+
+  /* --- Create Another --- */
+  document.getElementById('pookie-create-another').addEventListener('click', function() {
+    previewData = null;
+    showScreen('form');
+    form.reset();
+    selectedFiles = [];
+    previews.innerHTML = '';
+  });
+
+  /* --- Retry --- */
+  document.getElementById('pookie-retry').addEventListener('click', function() {
+    showScreen('form');
+  });
+})();
 </script>
 
 {% schema %}
