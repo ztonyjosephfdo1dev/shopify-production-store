@@ -16,6 +16,7 @@ import functions_framework
 import json
 import os
 import base64
+import time
 import traceback
 from services.openai_service import analyze_and_generate_text
 from services.replicate_service import virtual_tryon_hero, virtual_tryon_collage_grid
@@ -160,6 +161,10 @@ def _handle_preview(request):
         extra_prompt=extra_prompt,
     )
 
+    # Wait between calls to avoid Replicate 429 rate limit (free tier: burst of 1)
+    if hero_bytes:
+        time.sleep(15)
+
     # ===== STEP 3: Collage Grid (1 Replicate call) =====
     collage_bytes = virtual_tryon_collage_grid(
         garment_bytes=primary_image["bytes"],
@@ -190,12 +195,47 @@ def _handle_preview(request):
             "filename": "original.jpg",
         })
 
-    # Determine collections
+    # Determine collections — multiple fallback layers
+    CATEGORY_TO_COLLECTION = {
+        "kurti": ["kurti"], "kurti-set": ["kurti-set", "kurthi-set"],
+        "suits": ["suits"], "indo-western": ["indo-western"],
+        "top-wear": ["top-wear", "tops"], "tops": ["tops", "top-wear"],
+        "casual-top": ["casual-top", "tops"], "korean-top": ["korean-top", "tops"],
+        "shirt": ["shirt", "tops"], "blouse": ["blouse", "tops"],
+        "bodycon": ["bodycon"], "fancy-crop-top": ["fancy-crop-top", "tops", "top-wear"],
+        "single-piece": ["single-piece"], "gown": ["gown", "gown-1"],
+        "maxi": ["maxi"], "casual-maxi": ["casual-maxi", "maxi"],
+        "cord-set": ["cord-set"], "bottom": ["bottom", "bottom-1"],
+        "plazo": ["plazo", "bottom"], "skirt": ["skirt", "bottom"],
+        "inners": ["inners", "panties"],
+        "skin-care": ["skin-care"], "face-wash": ["face-wash", "skin-care"],
+        "body-lotion": ["body-lotion", "skin-care"],
+    }
+    # Garment type → collection mapping for AI-detected types
+    GARMENT_TO_COLLECTION = {
+        "crop top": ["fancy-crop-top", "tops"], "crop-top": ["fancy-crop-top", "tops"],
+        "top": ["tops", "top-wear"], "t-shirt": ["tops", "casual-top"],
+        "kurti": ["kurti"], "dress": ["single-piece"], "gown": ["gown"],
+        "maxi": ["maxi"], "palazzo": ["plazo"], "skirt": ["skirt"],
+        "blouse": ["blouse", "tops"], "shirt": ["shirt", "tops"],
+        "bodycon": ["bodycon"], "cord-set": ["cord-set"],
+        "korean top": ["korean-top", "tops"], "polo": ["tops", "top-wear"],
+    }
+
     collection_handles = []
-    if category:
+    if category and category in CATEGORY_TO_COLLECTION:
+        collection_handles = CATEGORY_TO_COLLECTION[category]
+    elif category:
         collection_handles = [category]
     elif suggested_collections:
         collection_handles = suggested_collections[:3]
+    elif detected_garment_type:
+        # Use AI-detected garment type to find collections
+        gt_lower = detected_garment_type.lower().strip()
+        collection_handles = GARMENT_TO_COLLECTION.get(gt_lower, ["tops", "top-wear"])
+    else:
+        # Ultimate fallback
+        collection_handles = ["tops", "top-wear"]
 
     # ===== Return preview (NOT yet created on Shopify) =====
     return (

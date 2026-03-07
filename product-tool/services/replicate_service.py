@@ -15,6 +15,7 @@ Background & poses auto-selected based on dress_style:
 import os
 import random
 import base64
+import time
 import httpx
 import replicate
 
@@ -172,34 +173,57 @@ def _run_replicate(garment_bytes: bytes, prompt: str) -> bytes | None:
     garment_uri = f"data:image/jpeg;base64,{garment_b64}"
     model_image_url = MODEL_IMAGES["default"]
 
-    # --- Primary: prunaai/p-tryon (~$0.01/run) ---
-    try:
-        output = replicate.run(
-            "prunaai/p-tryon:4e0e517e6b5eb42a8cbfbaed51ac2b8c01c24488a006dc5d8e0fc8e70f95e68b",
-            input={
+    MAX_RETRIES = 3
+    RETRY_DELAY = 15  # seconds — Replicate free tier: 6 req/min, burst 1
+
+    def _try_model(model_id: str, input_params: dict, label: str) -> object | None:
+        """Try a single model with retry on 429."""
+        for attempt in range(1, MAX_RETRIES + 1):
+            try:
+                return replicate.run(model_id, input=input_params)
+            except Exception as e:
+                err_str = str(e)
+                if "429" in err_str or "throttled" in err_str.lower():
+                    if attempt < MAX_RETRIES:
+                        wait = RETRY_DELAY * attempt
+                        print(f"[{label}] 429 rate limit, retry {attempt}/{MAX_RETRIES} after {wait}s...")
+                        time.sleep(wait)
+                        continue
+                print(f"[{label}] Failed (attempt {attempt}): {e}")
+                return None
+        return None
+
+    # --- Primary: prunaai/p-tryon (latest version, no pinned hash) ---
+    output = _try_model(
+        "prunaai/p-tryon",
+        {
+            "model_image": model_image_url,
+            "garment_image": garment_uri,
+            "category": "upper_body",
+            "num_inference_steps": 30,
+            "style_prompt": prompt,
+        },
+        "p-tryon",
+    )
+
+    # --- Fallback: omnious/vella-1.5 ---
+    if output is None:
+        print("[VTON] Primary failed, trying fallback omnious/vella-1.5...")
+        time.sleep(RETRY_DELAY)  # Avoid immediate 429 after primary attempts
+        output = _try_model(
+            "omnious/vella-1.5",
+            {
                 "model_image": model_image_url,
                 "garment_image": garment_uri,
-                "category": "upper_body",
-                "num_inference_steps": 30,
-                "style_prompt": prompt,
+                "category": "tops",
+                "prompt": prompt,
             },
+            "vella-1.5",
         )
-    except Exception as e:
-        print(f"p-tryon failed ({e}), trying fallback...")
-        # --- Fallback: omnious/vella-1.5 ---
-        try:
-            output = replicate.run(
-                "omnious/vella-1.5",
-                input={
-                    "model_image": model_image_url,
-                    "garment_image": garment_uri,
-                    "category": "tops",
-                    "prompt": prompt,
-                },
-            )
-        except Exception as e2:
-            print(f"Fallback VTON also failed: {e2}")
-            return None
+
+    if output is None:
+        print("[VTON] All models failed.")
+        return None
 
     # Extract URL from output
     if isinstance(output, list):
