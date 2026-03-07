@@ -206,9 +206,11 @@ def _handle_preview(request):
         })
 
     # Fallback: if image generation failed entirely, include raw upload
-    if not preview_images:
+    vton_failed = len(preview_images) == 0
+    if vton_failed:
+        print("[Preview] VTON failed — using raw upload as fallback")
         preview_images.append({
-            "label": "Original Upload (AI generation unavailable)",
+            "label": "Original Upload",
             "base64": primary_image["base64"],
             "filename": "original.jpg",
         })
@@ -237,6 +239,7 @@ def _handle_preview(request):
                 "compare_at_price": compare_at_price,
                 "collections": collection_handles,
                 "images": preview_images,
+                "vton_failed": vton_failed,
                 "ai_analysis": {
                     "garment_type": detected_garment_type,
                     "dress_style": dress_style,

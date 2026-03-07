@@ -153,7 +153,11 @@
 
       {%- comment -%} Generated Images {%- endcomment -%}
       <div class="pookie-creator__field">
-        <label class="pookie-creator__label">Generated Images</label>
+        <label class="pookie-creator__label">AI Generated Images <span id="pookie-img-count" style="color:#888;font-weight:normal;"></span></label>
+        <div id="pookie-vton-warning" style="display:none;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:14px;">
+          ⚠️ <strong>AI image generation failed.</strong> The image below is your original upload.<br>
+          <span style="color:#666;">Fix: Add a payment method at <a href="https://replicate.com/account/billing" target="_blank" style="color:#d97706;">replicate.com/account/billing</a> to enable VTON image generation.</span>
+        </div>
         <div id="pookie-preview-images" class="pookie-creator__preview-images" style="display:flex;gap:16px;flex-wrap:wrap;"></div>
       </div>
 
@@ -413,7 +417,20 @@
     /* Images */
     var imgContainer = document.getElementById('pookie-preview-images');
     imgContainer.innerHTML = '';
-    (p.images || []).forEach(function(img) {
+    var images = p.images || [];
+
+    /* Show/hide VTON failure warning */
+    var warning = document.getElementById('pookie-vton-warning');
+    var imgCount = document.getElementById('pookie-img-count');
+    if (p.vton_failed) {
+      warning.style.display = 'block';
+      imgCount.textContent = '(generation failed)';
+    } else {
+      warning.style.display = 'none';
+      imgCount.textContent = '(' + images.length + ' poses generated)';
+    }
+
+    images.forEach(function(img) {
       var wrap = document.createElement('div');
       wrap.className = 'img-wrap';
       var el = document.createElement('img');
