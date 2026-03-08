@@ -158,12 +158,12 @@ def _run_vton(garment_bytes: bytes, prompt: str) -> bytes | None:
     garment_uri = f"data:image/jpeg;base64,{garment_b64}"
     model_image_url = MODEL_IMAGES["default"]
 
-    # Primary: prunaai/p-tryon (latest)
+    # Primary: prunaai/p-tryon (correct field: clothing_images as list)
     output = _try_replicate(
         "prunaai/p-tryon",
         {
             "model_image": model_image_url,
-            "garment_image": garment_uri,
+            "clothing_images": [garment_uri],
             "category": "upper_body",
             "num_inference_steps": 30,
             "style_prompt": prompt,
@@ -171,19 +171,21 @@ def _run_vton(garment_bytes: bytes, prompt: str) -> bytes | None:
         "p-tryon",
     )
 
-    # Fallback: omnious/vella-1.5
+    # Fallback: cuuupid/idm-vton (confirmed working model)
     if output is None:
-        print("[VTON] Primary failed, trying fallback omnious/vella-1.5...")
+        print("[VTON] Primary failed, trying fallback cuuupid/idm-vton...")
         time.sleep(RETRY_DELAY)
         output = _try_replicate(
-            "omnious/vella-1.5",
+            "cuuupid/idm-vton:0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985",
             {
-                "model_image": model_image_url,
-                "garment_image": garment_uri,
-                "category": "tops",
-                "prompt": prompt,
+                "human_img": model_image_url,
+                "garm_img": garment_uri,
+                "garment_des": prompt,
+                "category": "upper_body",
+                "crop": True,
+                "steps": 30,
             },
-            "vella-1.5",
+            "idm-vton",
         )
 
     if output is None:
