@@ -1,0 +1,61 @@
+{% comment %}
+  Pookie Mirror — Product Page Try-On Button
+  Shows a "Try This On" CTA that opens the Pookie Mirror drawer
+  with the current product pre-loaded into an outfit slot.
+{% endcomment %}
+
+{% if product %}
+<div class="pm-tryon-section" style="margin: 8px 0;">
+  <button class="pm-tryon-btn" id="pm-tryon-product-btn" type="button">
+    👗 Try This On
+  </button>
+</div>
+
+<script>
+(function() {
+  var btn = document.getElementById('pm-tryon-product-btn');
+  if (!btn) return;
+
+  // Find the real garment photo by filename (always uploaded as "garment-real.jpg")
+  {% assign _garment_real_url = '' %}
+  {% for img in product.images %}
+    {% assign _img_src = img | image_url: width: 800 %}
+    {% if _img_src contains 'garment-real' %}
+      {% assign _garment_real_url = _img_src %}
+    {% endif %}
+  {% endfor %}
+
+  // Read product data from Liquid (rendered server-side)
+  var productData = {
+    id: {{ product.id | json }},
+    title: {{ product.title | json }},
+    image: {{ product.featured_image | image_url: width: 400 | json }},
+    product_image_3d: {{ _garment_real_url | json }},
+    url: {{ product.url | json }},
+    product_id: {{ product.id | json }},
+    variant_id: {{ product.selected_or_first_available_variant.id | json }},
+    garment_category: {{ product.metafields.pookie.garment_category.value | default: 'full_body' | json }},
+    garment_brief: {{ product.metafields.pookie.garment_brief.value | default: product.title | json }},
+    garment_design_details: {{ product.metafields.pookie.garment_design_details.value | default: '' | json }},
+  };
+
+  btn.addEventListener('click', function() {
+    // Dispatch custom event that the Pookie Mirror snippet listens for
+    document.dispatchEvent(new CustomEvent('pookie-mirror:open', { detail: productData }));
+  });
+})();
+</script>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Pookie Try-On Button",
+  "class": "pm-tryon-wrapper",
+  "settings": [],
+  "presets": [
+    {
+      "name": "Pookie Try-On Button"
+    }
+  ]
+}
+{% endschema %}

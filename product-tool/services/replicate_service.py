@@ -1,101 +1,89 @@
 """
-Replicate Service — 4-Pose Grid + Crop + Upscale Pipeline (v4)
+Replicate Service — 2-Pose VTON Pipeline (v5)
 
-Cost-optimized: 1 VTON call + 2 upscale calls = $0.012/product
+2 real VTON calls per product = 2 different model photos x 2 poses.
+Zoom (upper_body / lower_body / dresses) is auto-detected from garment type.
 
-Pipeline:
-  1. generate_4pose_grid()   → 1 call  → 2×2 grid image (4 poses)     $0.01
-  2. crop_grid_to_halves()   → local   → 2 horizontal halves           $0.00
-  3. upscale_image() ×2      → 2 calls → 2 upscaled halves             $0.002
-  4. crop_half_to_poses()    → local   → 4 individual hi-res poses     $0.00
-                                                                  ────────
-                                                            Total: $0.012
+  Pose 1: Front view          (model_1 randomly picked from GCS pool)
+  Pose 2: Side + back view    (model_2 randomly picked from GCS pool)
 
-Background & poses auto-selected based on dress_style:
-  traditional → warm/festive bg, ethnic poses
-  western     → minimal/urban bg, casual poses
-  fusion      → modern/artistic bg, mixed poses
-  formal      → elegant/clean bg, professional poses
+Cost: 2 x ~$0.010 = ~$0.020 per product
+
+LOGGING: All steps prefixed with [REPLICATE] for easy GCP log filtering.
 """
 
 import os
-import io
+import re
 import random
 import base64
 import time
 import httpx
 import replicate
-from PIL import Image
+from google.cloud import storage as gcs
+from services.image_utils import build_smart_collage
 
 
 # ---------------------------------------------------------------------------
-# Indian model reference image
+# GCS model image pool
+# Add:    gsutil cp <photo.jpg> gs://pookie-style-uploads/models/
+# Remove: gsutil rm gs://pookie-style-uploads/models/<filename>
 # ---------------------------------------------------------------------------
-MODEL_IMAGES = {
-    "default": os.environ.get(
-        "VTON_MODEL_IMAGE_URL",
-        "https://storage.googleapis.com/pookie-style-uploads/models/indian-model-1.jpg",
-    ),
-}
+GCS_BUCKET = "pookie-style-uploads"
+GCS_MODELS_PREFIX = "models/"
+
+_UNSPLASH_FALLBACKS = [
+    "https://images.unsplash.com/photo-1594744803329-e58b31239f85?w=512&h=768&fit=crop",
+    "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=512&h=768&fit=crop",
+    "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=512&h=768&fit=crop",
+]
+
+# Cached per Cloud Function instance (refreshes on cold start)
+_gcs_model_url_cache: list[str] | None = None
+
 
 # ---------------------------------------------------------------------------
-# POSE PRESETS — 4 poses per dress style for the 2×2 grid
+# Retry config
 # ---------------------------------------------------------------------------
-POSE_PRESETS = {
-    "traditional": [
-        "standing gracefully with hands folded at waist, slight head tilt, full front view",
-        "walking pose with dupatta flowing, looking over shoulder, three-quarter angle",
-        "three-quarter turn showing back detail and embroidery, elegant posture",
-        "twirling pose showing full flare of the outfit, joyful expression",
-    ],
-    "western": [
-        "confident walking pose on street, one hand in pocket, full front view",
-        "leaning against a wall casually, arms crossed, three-quarter angle",
-        "looking over shoulder showing back design, stylish pose",
-        "full front pose with hand on hip, smiling confidently",
-    ],
-    "fusion": [
-        "standing with one hand on hip, modern confident pose, full front view",
-        "side profile showing the fusion silhouette, elegant posture",
-        "walking pose showing the contemporary drape and cut, three-quarter angle",
-        "back pose showing unique back design or pattern, looking over shoulder",
-    ],
-    "formal": [
-        "standing straight, professional and poised, hands clasped, full front view",
-        "walking confidently with a structured handbag, three-quarter angle",
-        "three-quarter angle showing tailored fit and structure, power pose",
-        "full-length front view, one foot slightly forward, polished look",
-    ],
-}
+MAX_RETRIES = 5
+RETRY_DELAY = 12       # base seconds, overridden by retry_after in 429 error
+INTER_CALL_DELAY = 12  # seconds between separate Replicate API calls
+
 
 # ---------------------------------------------------------------------------
-# BACKGROUND PRESETS — Auto-selected based on dress style
+# Garment type -> VTON category (controls zoom area in output image)
+# top / kurti / shirt  -> upper_body  (waist-up crop)
+# bottom / skirt / etc -> lower_body  (hip-down crop)
+# dress / gown / saree -> dresses     (full body)
 # ---------------------------------------------------------------------------
-BACKGROUND_PRESETS = {
-    "traditional": [
-        "warm golden palace interior with arched doorways and marigold flowers",
-        "festive Indian courtyard with hanging diyas and warm sunset light",
-        "ornate Rajasthani haveli corridor with jharokha windows, soft warm lighting",
-        "temple garden with jasmine vines and terracotta tiles, golden hour",
-    ],
-    "western": [
-        "clean minimalist urban street with soft natural daylight",
-        "modern cafe exterior with exposed brick and plants",
-        "bright white studio with soft shadow, clean fashion photography look",
-        "city sidewalk with blurred bokeh lights, golden hour",
-    ],
-    "fusion": [
-        "contemporary art gallery with abstract paintings on white walls",
-        "modern rooftop garden with a mix of plants and city skyline",
-        "boutique hotel lobby with modern Indian art and warm lighting",
-        "colorful painted wall with geometric patterns, vibrant and trendy",
-    ],
-    "formal": [
-        "elegant office lobby with marble floors and soft daylight",
-        "minimalist gray studio backdrop with professional lighting",
-        "modern corporate interior with glass walls and warm tones",
-        "luxury hotel corridor with neutral tones and clean lines",
-    ],
+_GARMENT_CATEGORY_MAP = {
+    "top": "upper_body",
+    "kurti": "upper_body",
+    "shirt": "upper_body",
+    "blouse": "upper_body",
+    "crop-top": "upper_body",
+    "crop top": "upper_body",
+    "t-shirt": "upper_body",
+    "jacket": "upper_body",
+    "sweatshirt": "upper_body",
+    "hoodie": "upper_body",
+    "bottom": "lower_body",
+    "palazzo": "lower_body",
+    "skirt": "lower_body",
+    "jeans": "lower_body",
+    "trousers": "lower_body",
+    "pants": "lower_body",
+    "shorts": "lower_body",
+    "leggings": "lower_body",
+    "dress": "dresses",
+    "gown": "dresses",
+    "saree": "dresses",
+    "cord-set": "dresses",
+    "coord set": "dresses",
+    "co-ord": "dresses",
+    "jumpsuit": "dresses",
+    "anarkali": "dresses",
+    "lehenga": "dresses",
+    "sharara": "dresses",
 }
 
 
@@ -103,280 +91,187 @@ BACKGROUND_PRESETS = {
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-MAX_RETRIES = 3
-RETRY_DELAY = 15  # seconds
+def _log(msg: str):
+    """Print with [REPLICATE] prefix for easy GCP log filtering."""
+    print(f"[REPLICATE] {msg}")
 
 
-def _get_background(dress_style: str) -> str:
-    """Pick a random background prompt based on dress style."""
-    backgrounds = BACKGROUND_PRESETS.get(dress_style, BACKGROUND_PRESETS["western"])
-    return random.choice(backgrounds)
+def _get_vton_category(detected_garment_type: str) -> str:
+    """Map detected garment type string to VTON category param."""
+    if not detected_garment_type:
+        return "upper_body"
+    key = detected_garment_type.lower().strip()
+    if key in _GARMENT_CATEGORY_MAP:
+        return _GARMENT_CATEGORY_MAP[key]
+    for garment, category in _GARMENT_CATEGORY_MAP.items():
+        if garment in key or key in garment:
+            return category
+    _log(f"[CATEGORY] Unknown garment type '{detected_garment_type}' -> defaulting to upper_body")
+    return "upper_body"
 
 
-def _get_4_poses(dress_style: str) -> list[str]:
-    """Get 4 pose descriptions for the 2×2 grid."""
-    poses = POSE_PRESETS.get(dress_style, POSE_PRESETS["western"])
-    return random.sample(poses, min(4, len(poses)))
+def _list_gcs_model_images() -> list[str]:
+    """
+    List all images in gs://pookie-style-uploads/models/ and return their public URLs.
+    Result is cached per Cloud Function instance so GCS is only queried once per cold start.
+    """
+    global _gcs_model_url_cache
+    if _gcs_model_url_cache is not None:
+        return _gcs_model_url_cache
+
+    try:
+        client = gcs.Client()
+        bucket = client.bucket(GCS_BUCKET)
+        blobs = list(bucket.list_blobs(prefix=GCS_MODELS_PREFIX))
+        urls = []
+        for blob in blobs:
+            if blob.name == GCS_MODELS_PREFIX:
+                continue
+            if not blob.name.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
+                continue
+            urls.append(f"https://storage.googleapis.com/{GCS_BUCKET}/{blob.name}")
+
+        _log(f"[MODEL-IMG] GCS pool: {len(urls)} images")
+        _gcs_model_url_cache = urls
+        return urls
+
+    except Exception as e:
+        _log(f"[MODEL-IMG] GCS listing failed: {e} — using Unsplash fallbacks")
+        _gcs_model_url_cache = []
+        return []
+
+
+def _pick_model_images(n: int) -> list[str]:
+    """
+    Pick n random model image URLs from GCS pool.
+    Uses random.choices (with replacement) so it works even if pool has < n images.
+    Falls back to Unsplash if GCS is empty.
+    """
+    pool = _list_gcs_model_images() or _UNSPLASH_FALLBACKS
+    chosen = random.choices(pool, k=n)
+    _log(f"[MODEL-IMG] Selected: {', '.join(url.split('/')[-1] for url in chosen)}")
+    return chosen
 
 
 def _download_image(url: str) -> bytes:
-    """Download image from URL and return bytes."""
+    _log(f"[DOWNLOAD] {url[:80]}...")
     response = httpx.get(url, timeout=120.0, follow_redirects=True)
     response.raise_for_status()
+    _log(f"[DOWNLOAD] {len(response.content)} bytes")
     return response.content
 
 
-def _try_replicate(model_id: str, input_params: dict, label: str) -> object | None:
-    """Try a Replicate model with retry on 429 rate limit."""
+def _parse_retry_after(err_str: str) -> int:
+    """Extract retry_after seconds from a 429 error string. Adds 3s buffer."""
+    match = re.search(r"retry_after[^:]*:\s*(\d+)", err_str)
+    if match:
+        return int(match.group(1)) + 3
+    match = re.search(r"resets in ~(\d+)s", err_str)
+    if match:
+        return int(match.group(1)) + 3
+    return RETRY_DELAY
+
+
+def _try_replicate(model_id: str, input_params: dict, label: str):
+    """Run a Replicate model with retries on rate limit. Returns output or None."""
+    _log(f"[API-CALL] {label}: model={model_id.split(':')[0]}")
+
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            return replicate.run(model_id, input=input_params)
+            _log(f"[API-CALL] {label}: Attempt {attempt}/{MAX_RETRIES}...")
+            output = replicate.run(model_id, input=input_params)
+            _log(f"[API-CALL] {label}: SUCCESS")
+            return output
         except Exception as e:
             err_str = str(e)
+
             if "429" in err_str or "throttled" in err_str.lower():
-                if attempt < MAX_RETRIES:
-                    wait = RETRY_DELAY * attempt
-                    print(f"[{label}] 429 rate limit, retry {attempt}/{MAX_RETRIES} after {wait}s...")
-                    time.sleep(wait)
-                    continue
-            print(f"[{label}] Failed (attempt {attempt}): {e}")
-            return None
+                error_type = "RATE_LIMIT_429_NEED_$5_CREDIT" if "less than $5.0" in err_str else "RATE_LIMIT_429"
+            elif "422" in err_str:
+                error_type = "VALIDATION_ERROR_422"
+            elif "401" in err_str or "403" in err_str:
+                error_type = "AUTH_ERROR"
+            elif "404" in err_str:
+                error_type = "NOT_FOUND_404"
+            else:
+                error_type = "SERVER_ERROR"
+
+            _log(f"[API-CALL] {label}: Attempt {attempt} FAILED — {error_type}")
+            _log(f"[API-CALL] {label}: {err_str[:300]}")
+
+            # Hard errors — no point retrying
+            if error_type in ("VALIDATION_ERROR_422", "AUTH_ERROR", "NOT_FOUND_404"):
+                return None
+
+            if attempt < MAX_RETRIES:
+                wait = _parse_retry_after(err_str)
+                _log(f"[API-CALL] {label}: Waiting {wait}s before retry...")
+                time.sleep(wait)
+
+    _log(f"[API-CALL] {label}: All {MAX_RETRIES} attempts exhausted")
     return None
 
 
-def _run_vton(garment_bytes: bytes, prompt: str) -> bytes | None:
-    """
-    Run VTON with primary + fallback model.
-    Returns image bytes or None.
-    """
-    api_token = os.environ.get("REPLICATE_API_TOKEN")
-    if not api_token:
-        print("REPLICATE_API_TOKEN not set — skipping")
-        return None
-
-    garment_b64 = base64.b64encode(garment_bytes).decode("utf-8")
-    garment_uri = f"data:image/jpeg;base64,{garment_b64}"
-    model_image_url = MODEL_IMAGES["default"]
-
-    # Primary: prunaai/p-tryon (correct field: clothing_images as list)
-    output = _try_replicate(
-        "prunaai/p-tryon",
-        {
-            "model_image": model_image_url,
-            "clothing_images": [garment_uri],
-            "category": "upper_body",
-            "num_inference_steps": 30,
-            "style_prompt": prompt,
-        },
-        "p-tryon",
-    )
-
-    # Fallback: cuuupid/idm-vton (confirmed working model)
-    if output is None:
-        print("[VTON] Primary failed, trying fallback cuuupid/idm-vton...")
-        time.sleep(RETRY_DELAY)
-        output = _try_replicate(
-            "cuuupid/idm-vton:0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985",
-            {
-                "human_img": model_image_url,
-                "garm_img": garment_uri,
-                "garment_des": prompt,
-                "category": "upper_body",
-                "crop": True,
-                "steps": 30,
-            },
-            "idm-vton",
-        )
-
-    if output is None:
-        print("[VTON] All models failed.")
-        return None
-
-    # Extract URL from output
-    if isinstance(output, list):
-        result_url = str(output[0])
-    elif hasattr(output, "url"):
-        result_url = output.url
-    else:
-        result_url = str(output)
-
-    return _download_image(result_url)
-
-
-# ===========================================================================
-# PUBLIC API — Called from main.py
-# ===========================================================================
-
-
-def generate_4pose_grid(
+def _run_vton_single(
+    model_url: str,
     garment_bytes: bytes,
-    dress_style: str = "western",
+    category: str,
+    pose_label: str,
+    garment_brief: str = "",
+    accessories_note: str = "",
     extra_prompt: str = "",
 ) -> bytes | None:
     """
-    Generate a single 2×2 grid image with 4 poses (1 Replicate call).
-
-    The model wears the garment in 4 different poses arranged as:
-      [ Pose 1 ] [ Pose 2 ]
-      [ Pose 3 ] [ Pose 4 ]
-
-    Args:
-        garment_bytes: raw garment image bytes
-        dress_style: "traditional" | "western" | "fusion" | "formal"
-        extra_prompt: user's custom styling instruction
-
-    Returns:
-        bytes of the 2×2 grid image, or None on failure
+    Single VTON call: one model photo + garment -> one output image.
+    Tries primary model (idm-vton with garment_des) then fallback (p-tryon).
     """
-    background = _get_background(dress_style)
-    poses = _get_4_poses(dress_style)
+    _log(f"[VTON] [{pose_label}] model={model_url.split('/')[-1]}, category={category}")
 
-    grid_desc = "\n".join(f"  Panel {i+1}: {p}" for i, p in enumerate(poses))
+    garment_b64 = base64.b64encode(garment_bytes).decode("utf-8")
+    garment_uri = f"data:image/jpeg;base64,{garment_b64}"
 
-    prompt_parts = [
-        "Generate a single image arranged as a 2-row by 2-column grid (2×2 layout)",
-        "showing the same young Indian woman model wearing this exact garment in 4 different poses",
-        f"Background for all panels: {background}",
-        f"The 4 panels are:\n{grid_desc}",
-        "Each panel must be clearly separated with thin white borders",
-        "Professional fashion e-commerce photography, consistent lighting across all panels",
-        "High resolution, sharp details, full body visible in each panel",
-        "Each panel should be square and equal sized",
-    ]
-
+    # Build rich garment description for idm-vton (critical for fidelity)
+    garment_des = garment_brief or "garment"
+    if accessories_note:
+        garment_des += f". {accessories_note}"
     if extra_prompt:
-        prompt_parts.append(f"Additional styling note: {extra_prompt}")
+        garment_des += f". {extra_prompt}"
+    _log(f"[VTON] [{pose_label}] garment_des={garment_des[:120]}")
 
-    prompt = ". ".join(prompt_parts)
-    print(f"[4-Pose Grid] dress_style={dress_style}, prompt_length={len(prompt)}")
-
-    return _run_vton(garment_bytes, prompt)
-
-
-def crop_grid_to_halves(grid_image_bytes: bytes) -> list[bytes]:
-    """
-    Crop a 2×2 grid image into 2 horizontal halves.
-
-    Splits into top row and bottom row:
-      Top half:    [ Pose 1 ] [ Pose 2 ]
-      Bottom half: [ Pose 3 ] [ Pose 4 ]
-
-    Args:
-        grid_image_bytes: bytes of the 2×2 grid image
-
-    Returns:
-        list of 2 image bytes (JPEG) — [top_half, bottom_half]
-    """
-    try:
-        img = Image.open(io.BytesIO(grid_image_bytes))
-        if img.mode != "RGB":
-            img = img.convert("RGB")
-
-        w, h = img.size
-        mid_y = h // 2
-
-        halves = [
-            img.crop((0, 0, w, mid_y)),     # Top row (Pose 1 + Pose 2)
-            img.crop((0, mid_y, w, h)),      # Bottom row (Pose 3 + Pose 4)
-        ]
-
-        results = []
-        labels = ["top-half", "bottom-half"]
-        for i, half in enumerate(halves):
-            buf = io.BytesIO()
-            half.save(buf, format="JPEG", quality=95)
-            half_bytes = buf.getvalue()
-            print(f"[CropHalf] {labels[i]}: {half.size[0]}×{half.size[1]}px, {len(half_bytes)} bytes")
-            results.append(half_bytes)
-
-        return results
-
-    except Exception as e:
-        print(f"[CropHalf] Error splitting grid: {e}")
-        return []
-
-
-def crop_half_to_poses(half_image_bytes: bytes, half_label: str = "half") -> list[bytes]:
-    """
-    Crop a horizontal half (2 side-by-side poses) into 2 individual images.
-
-    Splits a wide image at the midpoint:
-      [ Left Pose ] [ Right Pose ]
-
-    Args:
-        half_image_bytes: bytes of the half image (already upscaled)
-        half_label: label for logging
-
-    Returns:
-        list of 2 image bytes (JPEG) — [left_pose, right_pose]
-    """
-    try:
-        img = Image.open(io.BytesIO(half_image_bytes))
-        if img.mode != "RGB":
-            img = img.convert("RGB")
-
-        w, h = img.size
-        mid_x = w // 2
-
-        poses = [
-            img.crop((0, 0, mid_x, h)),     # Left pose
-            img.crop((mid_x, 0, w, h)),      # Right pose
-        ]
-
-        results = []
-        for i, pose in enumerate(poses):
-            buf = io.BytesIO()
-            pose.save(buf, format="JPEG", quality=92)
-            pose_bytes = buf.getvalue()
-            print(f"[CropPose] {half_label} pose-{i+1}: {pose.size[0]}×{pose.size[1]}px, {len(pose_bytes)} bytes")
-            results.append(pose_bytes)
-
-        return results
-
-    except Exception as e:
-        print(f"[CropPose] Error splitting {half_label}: {e}")
-        return []
-
-
-def upscale_image(image_bytes: bytes, label: str = "image") -> bytes | None:
-    """
-    Upscale a single image 4x using Real-ESRGAN on Replicate.
-
-    Input:  ~512×512px (cropped pose)
-    Output: ~2048×2048px (upscaled, sharp)
-    Cost:   ~$0.001 per call
-
-    Args:
-        image_bytes: raw image bytes to upscale
-        label: label for logging
-
-    Returns:
-        upscaled image bytes, or original bytes on failure (graceful degradation)
-    """
-    api_token = os.environ.get("REPLICATE_API_TOKEN")
-    if not api_token:
-        print(f"[Upscale] No API token — returning original for {label}")
-        return image_bytes
-
-    b64 = base64.b64encode(image_bytes).decode("utf-8")
-    data_uri = f"data:image/jpeg;base64,{b64}"
-
+    # Primary: cuuupid/idm-vton (has garment_des for exact garment fidelity)
     output = _try_replicate(
-        "nightmareai/real-esrgan:f121d640bd286e1fdc67f9799164c1d5be36ff74576ee11c803ae5b665dd46aa",
+        "cuuupid/idm-vton:0513734a452173b8173e907e3a59d19a36266e55b48528559432bd21c7d7e985",
         {
-            "image": data_uri,
-            "scale": 4,
-            "face_enhance": True,
+            "human_img": model_url,
+            "garm_img": garment_uri,
+            "garment_des": garment_des,
+            "category": category,
+            "crop": True,
+            "steps": 30,
         },
-        f"esrgan-{label}",
+        f"idm-vton [{pose_label}]",
     )
 
+    # Fallback: prunaai/p-tryon (cheaper but no garment description param)
     if output is None:
-        # Graceful degradation: return original instead of failing
-        print(f"[Upscale] Failed for {label} — returning original")
-        return image_bytes
+        _log(f"[VTON] [{pose_label}] Primary failed — waiting {INTER_CALL_DELAY}s, trying fallback...")
+        time.sleep(INTER_CALL_DELAY)
+        output = _try_replicate(
+            "prunaai/p-tryon",
+            {
+                "model_image": model_url,
+                "clothing_images": [garment_uri],
+                "category": category,
+                "num_inference_steps": 30,
+            },
+            f"p-tryon [{pose_label}]",
+        )
 
-    # Output is a URL
+    if output is None:
+        _log(f"[VTON] [{pose_label}] All models failed")
+        return None
+
+    # Extract result URL from output
     if isinstance(output, list):
         result_url = str(output[0])
     elif hasattr(output, "url"):
@@ -385,101 +280,129 @@ def upscale_image(image_bytes: bytes, label: str = "image") -> bytes | None:
         result_url = str(output)
 
     try:
-        upscaled_bytes = _download_image(result_url)
-        # Verify upscale worked
-        upscaled_img = Image.open(io.BytesIO(upscaled_bytes))
-        print(f"[Upscale] {label}: {upscaled_img.size[0]}×{upscaled_img.size[1]}px, {len(upscaled_bytes)} bytes")
-        return upscaled_bytes
+        img_bytes = _download_image(result_url)
+        _log(f"[VTON] [{pose_label}] Done — {len(img_bytes)} bytes")
+        return img_bytes
     except Exception as e:
-        print(f"[Upscale] Download/verify failed for {label}: {e}")
-        return image_bytes
+        _log(f"[VTON] [{pose_label}] Download failed: {e}")
+        return None
 
+
+# ---------------------------------------------------------------------------
+# PUBLIC API — Called from main.py
+# ---------------------------------------------------------------------------
 
 def generate_and_process_poses(
     garment_bytes: bytes,
     dress_style: str = "western",
     extra_prompt: str = "",
+    detected_garment_type: str = "",
+    garment_brief: str = "",
+    accessories_note: str = "",
 ) -> list[dict]:
     """
-    Full pipeline: Grid → Split 2 halves → Upscale halves → Crop each → 4 images.
+    Generate 2 VTON images + build smart 6-panel collage.
 
-    User's cost-optimized approach:
-      Step 1: Generate 2×2 grid           (1 VTON call  — $0.01)
-      Step 2: Crop grid into 2 halves     (local        — free)
-      Step 3: Upscale each half 4×        (2 ESRGAN     — $0.002)
-      Step 4: Crop each upscaled half     (local        — free)
-      Result: 4 high-res individual poses              = $0.012
+    Output (2 images for Shopify):
+      Image 1 — Hero: Full model front view (primary product photo)
+      Image 2 — Collage: 6-panel garment-aware zoom crops
 
-    Args:
-        garment_bytes: raw garment image bytes
-        dress_style: "traditional" | "western" | "fusion" | "formal"
-        extra_prompt: user's custom styling instruction
+    The collage is built locally via PIL ($0.00) from the 2 VTON outputs.
+    Crop panels are selected based on garment type (crop top, saree, etc.)
+    to highlight exactly what buyers inspect for that garment.
+
+    Cost: 2 × ~$0.024 = ~$0.048 per product (collage is free)
 
     Returns:
-        list of dicts with keys: label, bytes, filename
-        Empty list if generation fails entirely.
+        list of dicts: [{label, bytes, filename}, ...]
+        Empty list if all calls fail.
     """
-    pose_labels = ["Front View", "Three-Quarter View", "Back Detail", "Dynamic Pose"]
-
-    # ===== Step 1: Generate 2×2 grid (1 Replicate call — $0.01) =====
-    print("[Pipeline] Step 1/4: Generating 4-pose grid...")
-    grid_bytes = generate_4pose_grid(garment_bytes, dress_style, extra_prompt)
-
-    if grid_bytes is None:
-        print("[Pipeline] Grid generation failed — no images.")
+    if not os.environ.get("REPLICATE_API_TOKEN"):
+        _log("[PIPELINE] ERROR: REPLICATE_API_TOKEN not set!")
         return []
 
-    # ===== Step 2: Crop grid into 2 horizontal halves (local, free) =====
-    print("[Pipeline] Step 2/4: Splitting grid into 2 halves...")
-    halves = crop_grid_to_halves(grid_bytes)
+    category = _get_vton_category(detected_garment_type)
+    _log(f"[PIPELINE] garment='{detected_garment_type}' -> category={category}, style={dress_style}")
+    if garment_brief:
+        _log(f"[PIPELINE] garment_brief: {garment_brief[:100]}")
 
-    if not halves or len(halves) < 2:
-        print("[Pipeline] Halving failed — returning grid as single image.")
-        return [{
-            "label": "4-Pose Grid",
-            "bytes": grid_bytes,
-            "filename": "poses-grid.jpg",
-        }]
+    # Auto-generate accessories_note from dress_style if not provided by OpenAI
+    if not accessories_note:
+        if dress_style in ("western", "formal"):
+            accessories_note = "Western styling, minimal accessories, simple chain only, no bindi, no Indian jewelry, no Indian earrings"
+        elif dress_style == "traditional":
+            accessories_note = "Traditional Indian styling, ethnic jewelry, jhumkas, bangles appropriate"
+        elif dress_style == "fusion":
+            accessories_note = "Modern fusion styling, mix of minimal western and subtle ethnic accessories"
 
-    # ===== Step 3: Upscale each half 4× (2 Replicate calls — $0.002) =====
-    print("[Pipeline] Step 3/4: Upscaling 2 halves...")
-    half_labels = ["top-half", "bottom-half"]
-    upscaled_halves = []
+    # Pick TWO different model images for pose variety
+    model_urls = _pick_model_images(2)
+    if len(model_urls) < 2:
+        model_urls = model_urls * 2  # duplicate if pool too small
 
-    for i, half_bytes in enumerate(halves):
-        upscaled = upscale_image(half_bytes, label=half_labels[i])
-        upscaled_halves.append(upscaled)
-        # Delay between upscale calls to avoid rate limits
-        if i < len(halves) - 1:
-            time.sleep(2)
+    poses = [
+        ("Front View",       "front-view",     model_urls[0]),
+        ("Side & Back View", "side-back-view",  model_urls[1]),
+    ]
 
-    # ===== Step 4: Crop each upscaled half into 2 individual poses (local, free) =====
-    print("[Pipeline] Step 4/4: Cropping upscaled halves into 4 poses...")
     results = []
-    pose_idx = 0
+    for i, (label, slug, model_url) in enumerate(poses):
+        if i > 0:
+            _log(f"[PIPELINE] Waiting {INTER_CALL_DELAY}s between calls...")
+            time.sleep(INTER_CALL_DELAY)
 
-    for i, upscaled_half in enumerate(upscaled_halves):
-        poses = crop_half_to_poses(upscaled_half, half_label=half_labels[i])
+        _log(f"[PIPELINE] Generating pose {i+1}/2: {label}")
+        img_bytes = _run_vton_single(
+            model_url, garment_bytes, category, label,
+            garment_brief=garment_brief,
+            accessories_note=accessories_note,
+            extra_prompt=extra_prompt,
+        )
 
-        if not poses:
-            # Fallback: return the upscaled half as-is
-            label = pose_labels[pose_idx] if pose_idx < len(pose_labels) else f"Pose {pose_idx+1}"
-            results.append({
-                "label": f"{label} (half)",
-                "bytes": upscaled_half,
-                "filename": f"pose-{pose_idx+1}-half.jpg",
-            })
-            pose_idx += 1
-            continue
-
-        for pose_bytes in poses:
-            label = pose_labels[pose_idx] if pose_idx < len(pose_labels) else f"Pose {pose_idx+1}"
+        if img_bytes:
             results.append({
                 "label": label,
-                "bytes": pose_bytes,
-                "filename": f"pose-{pose_idx+1}-{label.lower().replace(' ', '-')}.jpg",
+                "bytes": img_bytes,
+                "filename": f"pose-{i+1}-{slug}.jpg",
             })
-            pose_idx += 1
+        else:
+            _log(f"[PIPELINE] Pose {i+1} ({label}) failed — skipping")
 
-    print(f"[Pipeline] Complete: {len(results)} hi-res images ready.")
-    return results
+    _log(f"[PIPELINE] VTON complete: {len(results)}/2 images generated")
+
+    if not results:
+        return []
+
+    # ===== Build final output: Hero + Smart Collage =====
+    front_bytes = results[0]["bytes"]
+    side_bytes = results[1]["bytes"] if len(results) > 1 else front_bytes
+
+    final_images = [
+        {
+            "label": "Model View",
+            "bytes": front_bytes,
+            "filename": "hero-front-view.jpg",
+        },
+    ]
+
+    # Build 6-panel collage from smart crops (free — local PIL)
+    _log(f"[PIPELINE] Building 6-panel collage for garment='{detected_garment_type}'...")
+    try:
+        collage_bytes = build_smart_collage(
+            front_image_bytes=front_bytes,
+            side_image_bytes=side_bytes,
+            garment_type=detected_garment_type,
+        )
+        final_images.append({
+            "label": "Detail Views",
+            "bytes": collage_bytes,
+            "filename": "collage-detail-views.jpg",
+        })
+        _log(f"[PIPELINE] Collage built: {len(collage_bytes)} bytes")
+    except Exception as e:
+        _log(f"[PIPELINE] Collage build failed: {e} — adding raw side view")
+        if len(results) > 1:
+            final_images.append(results[1])
+
+    _log(f"[PIPELINE] Final output: {len(final_images)} images (hero + collage)")
+    return final_images

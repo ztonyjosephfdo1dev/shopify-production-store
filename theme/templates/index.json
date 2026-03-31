@@ -7,12 +7,13 @@
           "type": "slide",
           "settings": {
             "subheading": "New arrivals",
-            "heading": "Spring collection 2026",
+            "heading": "Summer collection 2026",
             "cta_text": "Shop now",
             "cta_link": "shopify://collections",
             "cta_style": "solid",
             "position": "center",
-            "overlay": 30
+            "overlay": 30,
+            "image": "shopify://shop_images/pookie-hero-summer-collection.jpg"
           }
         },
         "slide-2": {
@@ -24,7 +25,8 @@
             "cta_link": "shopify://collections/kurti",
             "cta_style": "solid",
             "position": "left",
-            "overlay": 35
+            "overlay": 35,
+            "image": "shopify://shop_images/pookie-hero-ethnic-elegance.jpg"
           }
         },
         "slide-3": {
@@ -36,7 +38,8 @@
             "cta_link": "shopify://collections/cord-set",
             "cta_style": "outline",
             "position": "center",
-            "overlay": 30
+            "overlay": 30,
+            "image": "shopify://shop_images/pookie-hero-cord-set-collection.jpg"
           }
         },
         "slide-4": {
@@ -48,17 +51,22 @@
             "cta_link": "shopify://collections",
             "cta_style": "solid",
             "position": "center",
-            "overlay": 40
+            "overlay": 40,
+            "image": "shopify://shop_images/pookie-hero-flat-20-off.jpg"
           }
         }
       },
-      "block_order": ["slide-1", "slide-2", "slide-3", "slide-4"],
+      "block_order": [
+        "slide-1",
+        "slide-2",
+        "slide-3",
+        "slide-4"
+      ],
       "settings": {
         "auto_rotate": true,
         "speed": 5
       }
     },
-
     "pookie-marquee": {
       "type": "pookie-marquee",
       "blocks": {
@@ -98,14 +106,19 @@
           }
         }
       },
-      "block_order": ["msg-1", "msg-2", "msg-3", "msg-4", "msg-5"],
+      "block_order": [
+        "msg-1",
+        "msg-2",
+        "msg-3",
+        "msg-4",
+        "msg-5"
+      ],
       "settings": {
         "speed": 25,
         "bg_color": "#1a1a1a",
         "text_color": "#ffffff"
       }
     },
-
     "pookie-categories": {
       "type": "pookie-categories",
       "blocks": {
@@ -113,46 +126,59 @@
           "type": "category",
           "settings": {
             "collection": "kurti",
-            "custom_title": "Ethnic wear"
+            "custom_title": "Ethnic wear",
+            "custom_image": "shopify://shop_images/pookie-cat-ethnic-wear.jpg"
           }
         },
         "cat-western": {
           "type": "category",
           "settings": {
             "collection": "tops",
-            "custom_title": "Western wear"
+            "custom_title": "Western wear",
+            "custom_image": "shopify://shop_images/pookie-cat-western-wear.jpg"
           }
         },
         "cat-dresses": {
           "type": "category",
           "settings": {
             "collection": "single-piece",
-            "custom_title": "Dresses"
+            "custom_title": "Dresses",
+            "custom_image": "shopify://shop_images/pookie-cat-dresses.jpg"
           }
         },
         "cat-cordsets": {
           "type": "category",
           "settings": {
             "collection": "cord-set",
-            "custom_title": "Cord sets"
+            "custom_title": "Cord sets",
+            "custom_image": "shopify://shop_images/pookie-cat-cord-sets.jpg"
           }
         },
         "cat-innerwear": {
           "type": "category",
           "settings": {
             "collection": "inners",
-            "custom_title": "Innerwear"
+            "custom_title": "Innerwear",
+            "custom_image": "shopify://shop_images/pookie-cat-innerwear.jpg"
           }
         },
         "cat-beauty": {
           "type": "category",
           "settings": {
             "collection": "skin-care",
-            "custom_title": "Beauty & skincare"
+            "custom_title": "Beauty & skincare",
+            "custom_image": "shopify://shop_images/pookie-cat-beauty.jpg"
           }
         }
       },
-      "block_order": ["cat-ethnic", "cat-western", "cat-dresses", "cat-cordsets", "cat-innerwear", "cat-beauty"],
+      "block_order": [
+        "cat-ethnic",
+        "cat-western",
+        "cat-dresses",
+        "cat-cordsets",
+        "cat-innerwear",
+        "cat-beauty"
+      ],
       "settings": {
         "heading": "Shop by category",
         "subheading": "Find what suits your style",
@@ -160,7 +186,6 @@
         "columns_mobile": "2"
       }
     },
-
     "new-arrivals": {
       "type": "featured-collection",
       "settings": {
@@ -187,7 +212,6 @@
         "padding_bottom": 36
       }
     },
-
     "promo-banner": {
       "type": "image-banner",
       "blocks": {
@@ -217,7 +241,11 @@
           }
         }
       },
-      "block_order": ["promo-heading", "promo-text", "promo-buttons"],
+      "block_order": [
+        "promo-heading",
+        "promo-text",
+        "promo-buttons"
+      ],
       "settings": {
         "image_overlay_opacity": 40,
         "image_height": "medium",
@@ -228,10 +256,10 @@
         "image_behavior": "none",
         "mobile_content_alignment": "center",
         "stack_images_on_mobile": true,
-        "show_text_below": false
+        "show_text_below": false,
+        "image": "shopify://shop_images/pookie-promo-summer-sale.jpg"
       }
     },
-
     "best-sellers": {
       "type": "featured-collection",
       "settings": {
@@ -258,7 +286,6 @@
         "padding_bottom": 36
       }
     },
-
     "pookie-brand-story": {
       "type": "pookie-brand-story",
       "blocks": {
@@ -299,12 +326,18 @@
           }
         }
       },
-      "block_order": ["story-tagline", "story-heading", "story-text", "story-features", "story-button"],
+      "block_order": [
+        "story-tagline",
+        "story-heading",
+        "story-text",
+        "story-features",
+        "story-button"
+      ],
       "settings": {
-        "layout": "image-first"
+        "layout": "image-first",
+        "image": "shopify://shop_images/pookie-brand-story.jpg"
       }
     },
-
     "newsletter": {
       "type": "newsletter",
       "blocks": {
@@ -317,7 +350,7 @@
         "nl-paragraph": {
           "type": "paragraph",
           "settings": {
-            "text": "<p>Subscribe for exclusive drops, early access to sales, and styling tips delivered to your inbox.<\/p>"
+            "text": "<p>Subscribe for exclusive drops, early access to sales, and styling tips delivered to your inbox.</p>"
           }
         },
         "nl-email": {
@@ -325,7 +358,11 @@
           "settings": {}
         }
       },
-      "block_order": ["nl-heading", "nl-paragraph", "nl-email"],
+      "block_order": [
+        "nl-heading",
+        "nl-paragraph",
+        "nl-email"
+      ],
       "settings": {
         "color_scheme": "scheme-2",
         "full_width": true,

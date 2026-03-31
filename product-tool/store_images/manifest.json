@@ -1,0 +1,101 @@
+{
+  "created_at": "2026-03-21T08:48:22.547069+00:00",
+  "images": {
+    "pookie-hero-summer-collection.jpg": {
+      "key": "hero_summer_collection",
+      "generated": true,
+      "size_kb": 245.8,
+      "dimensions": "1344x768",
+      "uploaded": true,
+      "shopify_ref": "shopify://shop_images/pookie-hero-summer-collection.jpg"
+    },
+    "pookie-hero-ethnic-elegance.jpg": {
+      "key": "hero_ethnic_elegance",
+      "generated": true,
+      "size_kb": 119.9,
+      "dimensions": "1344x768",
+      "uploaded": true,
+      "shopify_ref": "shopify://shop_images/pookie-hero-ethnic-elegance.jpg"
+    },
+    "pookie-hero-cord-set-collection.jpg": {
+      "key": "hero_cord_set",
+      "generated": true,
+      "size_kb": 184.8,
+      "dimensions": "1344x768",
+      "uploaded": true,
+      "shopify_ref": "shopify://shop_images/pookie-hero-cord-set-collection.jpg"
+    },
+    "pookie-hero-flat-20-off.jpg": {
+      "key": "hero_sale",
+      "generated": true,
+      "size_kb": 139.4,
+      "dimensions": "1344x768",
+      "uploaded": true,
+      "shopify_ref": "shopify://shop_images/pookie-hero-flat-20-off.jpg"
+    },
+    "pookie-cat-ethnic-wear.jpg": {
+      "key": "cat_ethnic_wear",
+      "generated": true,
+      "size_kb": 125.6,
+      "dimensions": "583x800",
+      "uploaded": true,
+      "shopify_ref": "shopify://shop_images/pookie-cat-ethnic-wear.jpg"
+    },
+    "pookie-cat-western-wear.jpg": {
+      "key": "cat_western_wear",
+      "generated": true,
+      "size_kb": 88.3,
+      "dimensions": "583x800",
+      "uploaded": true,
+      "shopify_ref": "shopify://shop_images/pookie-cat-western-wear.jpg"
+    },
+    "pookie-cat-dresses.jpg": {
+      "key": "cat_dresses",
+      "generated": true,
+      "size_kb": 66.1,
+      "dimensions": "583x800",
+      "uploaded": true,
+      "shopify_ref": "shopify://shop_images/pookie-cat-dresses.jpg"
+    },
+    "pookie-cat-cord-sets.jpg": {
+      "key": "cat_cord_sets",
+      "generated": true,
+      "size_kb": 68.1,
+      "dimensions": "583x800",
+      "uploaded": true,
+      "shopify_ref": "shopify://shop_images/pookie-cat-cord-sets.jpg"
+    },
+    "pookie-cat-innerwear.jpg": {
+      "key": "cat_innerwear",
+      "generated": true,
+      "size_kb": 124.1,
+      "dimensions": "583x800",
+      "uploaded": true,
+      "shopify_ref": "shopify://shop_images/pookie-cat-innerwear.jpg"
+    },
+    "pookie-cat-beauty.jpg": {
+      "key": "cat_beauty",
+      "generated": true,
+      "size_kb": 96.1,
+      "dimensions": "583x800",
+      "uploaded": true,
+      "shopify_ref": "shopify://shop_images/pookie-cat-beauty.jpg"
+    },
+    "pookie-brand-story.jpg": {
+      "key": "brand_story",
+      "generated": true,
+      "size_kb": 182.7,
+      "dimensions": "729x1000",
+      "uploaded": true,
+      "shopify_ref": "shopify://shop_images/pookie-brand-story.jpg"
+    },
+    "pookie-promo-summer-sale.jpg": {
+      "key": "promo_summer_sale",
+      "generated": true,
+      "size_kb": 238.2,
+      "dimensions": "1344x768",
+      "uploaded": true,
+      "shopify_ref": "shopify://shop_images/pookie-promo-summer-sale.jpg"
+    }
+  }
+}

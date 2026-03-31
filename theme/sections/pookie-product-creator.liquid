@@ -15,12 +15,25 @@
 
     {%- comment -%} ========== SCREEN 1: UPLOAD FORM ========== {%- endcomment -%}
     <form id="pookie-creator-form" class="pookie-creator__form" enctype="multipart/form-data">
+      {%- comment -%} Bulk Upload Toggle {%- endcomment -%}
+      <div class="pookie-creator__field pookie-creator__bulk-toggle">
+        <label class="pookie-creator__label">Upload Mode</label>
+        <div class="pookie-creator__switch-row">
+          <label class="pookie-creator__switch">
+            <input type="checkbox" id="pookie-bulk-mode" />
+            <span class="pookie-creator__switch-slider"></span>
+          </label>
+          <span id="pookie-bulk-label" class="pookie-creator__switch-text">Single Product</span>
+        </div>
+        <p class="pookie-creator__hint">Toggle ON for bulk upload — each image becomes a separate product with shared details.</p>
+      </div>
+
       {%- comment -%} Image Upload {%- endcomment -%}
       <div class="pookie-creator__field">
         <label class="pookie-creator__label">
           Product Photos <span class="pookie-creator__required">*</span>
         </label>
-        <p class="pookie-creator__hint">Upload 1-3 photos (phone camera, hanger, flat-lay, mannequin)</p>
+        <p id="pookie-upload-hint" class="pookie-creator__hint">Upload 1-3 photos (phone camera, hanger, flat-lay, mannequin)</p>
         <div id="pookie-dropzone" class="pookie-creator__dropzone">
           <div class="pookie-creator__dropzone-content">
             <svg class="pookie-creator__upload-icon" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -29,7 +42,7 @@
               <line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
             <p>Drag & drop photos here or <span class="pookie-creator__browse">browse</span></p>
-            <p class="pookie-creator__hint">JPG, PNG — max 10 MB each — up to 3 photos</p>
+            <p id="pookie-dropzone-hint" class="pookie-creator__hint">JPG, PNG — max 10 MB each — up to 3 photos</p>
           </div>
           <input type="file" id="pookie-images" name="images" accept="image/jpeg,image/png,image/webp" multiple class="pookie-creator__file-input" />
         </div>
@@ -69,12 +82,12 @@
       </div>
 
       {%- comment -%} Optional Fields {%- endcomment -%}
-      <div class="pookie-creator__field">
+      <div class="pookie-creator__field" id="pookie-field-name">
         <label class="pookie-creator__label" for="pookie-name">Product Name <span class="pookie-creator__optional">(optional — AI generates if blank)</span></label>
         <input type="text" id="pookie-name" name="name" class="pookie-creator__input" placeholder="e.g., Emerald Green A-Line Kurti" />
       </div>
 
-      <div class="pookie-creator__field">
+      <div class="pookie-creator__field" id="pookie-field-description">
         <label class="pookie-creator__label" for="pookie-description">Description / Notes <span class="pookie-creator__optional">(optional — AI uses to generate listing)</span></label>
         <textarea id="pookie-description" name="description" class="pookie-creator__textarea" rows="3" placeholder="Any details: fabric, occasion, special features..."></textarea>
         <label class="pookie-creator__checkbox-label" style="margin-top:8px;">
@@ -126,10 +139,64 @@
         </select>
       </div>
 
-      {%- comment -%} Extra Styling Prompt {%- endcomment -%}
+      {%- comment -%} Status {%- endcomment -%}
       <div class="pookie-creator__field">
+        <label class="pookie-creator__label" for="pookie-status">Product Status</label>
+        <select id="pookie-status" name="status" class="pookie-creator__select">
+          <option value="DRAFT" selected>Draft (review before publishing)</option>
+          <option value="ACTIVE">Active (publish immediately)</option>
+        </select>
+      </div>
+
+      {%- comment -%} Inventory Quantity {%- endcomment -%}
+      <div class="pookie-creator__field">
+        <label class="pookie-creator__label" for="pookie-quantity">
+          Inventory Quantity (per variant) <span class="pookie-creator__optional">(default: 1)</span>
+        </label>
+        <input type="number" id="pookie-quantity" name="quantity" class="pookie-creator__input" placeholder="1" min="1" max="9999" value="1" />
+        <p class="pookie-creator__hint">Each size variant will be stocked with this quantity.</p>
+      </div>
+
+      {%- comment -%} Extra Styling Prompt {%- endcomment -%}
+      <div class="pookie-creator__field" id="pookie-field-extra-prompt">
         <label class="pookie-creator__label" for="pookie-extra-prompt">Styling / Pose Instructions <span class="pookie-creator__optional">(optional)</span></label>
         <textarea id="pookie-extra-prompt" name="extra_prompt" class="pookie-creator__textarea" rows="2" placeholder="e.g., Show with traditional Indian poses, add floral accessories, evening party vibe..."></textarea>
+      </div>
+
+      {%- comment -%} Image Quality {%- endcomment -%}
+      <div class="pookie-creator__field" id="pookie-field-image-quality">
+        <label class="pookie-creator__label" for="pookie-image-quality">Image Quality</label>
+        <select id="pookie-image-quality" name="image_quality" class="pookie-creator__select">
+          <option value="low">Low — fastest (~₹1, quick preview)</option>
+          <option value="medium" selected>Medium — recommended (~₹4, good detail)</option>
+          <option value="high">High — premium (~₹17, best quality)</option>
+        </select>
+        <p class="pookie-creator__hint">Higher quality = better detail + longer generation time.</p>
+      </div>
+
+      {%- comment -%} Real Garment Photo Option {%- endcomment -%}
+      <div class="pookie-creator__field" id="pookie-field-garment-photo">
+        <label class="pookie-creator__label">Real Garment Photo (added as last product image)</label>
+        <p class="pookie-creator__hint">Include the original garment photo alongside the AI-generated images on Shopify.</p>
+        <div class="pookie-creator__radio-group">
+          <label class="pookie-creator__radio-label">
+            <input type="radio" name="garment_photo_option" value="auto" checked class="pookie-creator__radio-input" />
+            <span>Use first uploaded photo automatically</span>
+          </label>
+          <label class="pookie-creator__radio-label">
+            <input type="radio" name="garment_photo_option" value="manual" class="pookie-creator__radio-input" />
+            <span>Upload a separate clean garment photo</span>
+          </label>
+          <label class="pookie-creator__radio-label">
+            <input type="radio" name="garment_photo_option" value="skip" class="pookie-creator__radio-input" />
+            <span>Skip — don't include real garment photo</span>
+          </label>
+        </div>
+        <div id="pookie-garment-manual-upload" class="pookie-creator__manual-upload" style="display:none; margin-top: 10px;">
+          <input type="file" id="pookie-garment-photo" name="garment_photo" accept="image/jpeg,image/png,image/webp" class="pookie-creator__file-input-inline" />
+          <p class="pookie-creator__hint">Upload a clean, well-lit photo of the garment (max 10 MB).</p>
+          <div id="pookie-garment-preview" class="pookie-creator__garment-preview"></div>
+        </div>
       </div>
 
       <button type="submit" id="pookie-submit" class="pookie-creator__submit">
@@ -156,7 +223,7 @@
         <label class="pookie-creator__label">AI Generated Images <span id="pookie-img-count" style="color:#888;font-weight:normal;"></span></label>
         <div id="pookie-vton-warning" style="display:none;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:14px;">
           ⚠️ <strong>AI image generation failed.</strong> The image below is your original upload.<br>
-          <span style="color:#666;">Fix: Add a payment method at <a href="https://replicate.com/account/billing" target="_blank" style="color:#d97706;">replicate.com/account/billing</a> to enable VTON image generation.</span>
+          <span style="color:#666;">This may be a temporary issue. Try again or check your OpenAI API key balance.</span>
         </div>
         <div id="pookie-preview-images" class="pookie-creator__preview-images" style="display:flex;gap:16px;flex-wrap:wrap;"></div>
       </div>
@@ -198,6 +265,18 @@
       <div class="pookie-creator__field">
         <label class="pookie-creator__label">Product Details</label>
         <div id="pookie-preview-details" style="font-size:14px;line-height:1.8;"></div>
+        <div style="margin-top:12px;display:flex;gap:16px;align-items:center;">
+          <label style="font-weight:600;font-size:14px;">Status:</label>
+          <select id="pookie-preview-status" class="pookie-creator__select" style="width:auto;min-width:180px;">
+            <option value="DRAFT">Draft (review before publishing)</option>
+            <option value="ACTIVE">Active (publish immediately)</option>
+          </select>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:16px;align-items:center;">
+          <label style="font-weight:600;font-size:14px;">Inventory (per variant):</label>
+          <input type="number" id="pookie-preview-quantity" class="pookie-creator__input" style="width:80px;" min="1" max="9999" value="1" />
+          <span style="font-size:13px;color:#888;">units per size variant</span>
+        </div>
       </div>
 
       {%- comment -%} Action Buttons {%- endcomment -%}
@@ -211,12 +290,15 @@
     <div id="pookie-success" class="pookie-creator__success" style="display:none;">
       <div class="pookie-creator__success-icon">&#x2705;</div>
       <h2>Product Created Successfully!</h2>
-      <p id="pookie-success-name" class="pookie-creator__success-name"></p>
-      <div class="pookie-creator__success-links">
-        <a id="pookie-admin-link" href="#" target="_blank" class="pookie-creator__link pookie-creator__link--admin">View in Shopify Admin &rarr;</a>
-        <a id="pookie-store-link" href="#" target="_blank" class="pookie-creator__link pookie-creator__link--store">View on Store &rarr;</a>
+      <div id="pookie-single-result">
+        <p id="pookie-success-name" class="pookie-creator__success-name"></p>
+        <div class="pookie-creator__success-links">
+          <a id="pookie-admin-link" href="#" target="_blank" class="pookie-creator__link pookie-creator__link--admin">View in Shopify Admin &rarr;</a>
+          <a id="pookie-store-link" href="#" target="_blank" class="pookie-creator__link pookie-creator__link--store">View on Store &rarr;</a>
+        </div>
+        <div id="pookie-success-details" class="pookie-creator__success-details"></div>
       </div>
-      <div id="pookie-success-details" class="pookie-creator__success-details"></div>
+      <div id="pookie-bulk-results" class="pookie-bulk-results" style="display:none;"></div>
       <button id="pookie-create-another" class="pookie-creator__submit pookie-creator__submit--another">Create Another Product</button>
     </div>
 
@@ -277,6 +359,81 @@
   var errorDiv = document.getElementById('pookie-error');
   var selectedFiles = [];
   var previewData = null; /* Stores backend response for confirm step */
+  var manualGarmentFile = null; /* Separate garment photo for manual upload */
+  var isBulkMode = false;
+
+  /* --- Bulk Mode Toggle --- */
+  var bulkToggle = document.getElementById('pookie-bulk-mode');
+  var bulkLabel = document.getElementById('pookie-bulk-label');
+  if (bulkToggle) {
+    bulkToggle.addEventListener('change', function() {
+      isBulkMode = this.checked;
+      bulkLabel.textContent = isBulkMode ? 'Bulk Upload \u2014 each photo = 1 product' : 'Single Product';
+      /* All form fields stay visible — they apply to every product */
+      var uploadHint = document.getElementById('pookie-upload-hint');
+      if (uploadHint) uploadHint.textContent = isBulkMode
+        ? 'Upload up to 20 photos \u2014 each becomes a separate product'
+        : 'Upload 1-3 photos (phone camera, hanger, flat-lay, mannequin)';
+      var dropzoneHint = document.getElementById('pookie-dropzone-hint');
+      if (dropzoneHint) dropzoneHint.textContent = isBulkMode
+        ? 'JPG, PNG \u2014 max 10 MB each \u2014 up to 20 photos'
+        : 'JPG, PNG \u2014 max 10 MB each \u2014 up to 3 photos';
+      selectedFiles = [];
+      renderPreviews();
+      updateSubmitButton();
+    });
+  }
+  function updateSubmitButton() {
+    var txt = document.querySelector('.pookie-creator__submit-text');
+    if (!txt) return;
+    if (isBulkMode) {
+      txt.textContent = selectedFiles.length > 0
+        ? 'Create ' + selectedFiles.length + ' Product' + (selectedFiles.length !== 1 ? 's' : '')
+        : 'Create Products';
+    } else {
+      txt.textContent = 'Generate Preview';
+    }
+  }
+
+  /* --- Garment Photo Radio Toggle --- */
+  var garmentRadios = document.querySelectorAll('input[name="garment_photo_option"]');
+  var garmentManualDiv = document.getElementById('pookie-garment-manual-upload');
+  var garmentFileInput = document.getElementById('pookie-garment-photo');
+  var garmentPreviewDiv = document.getElementById('pookie-garment-preview');
+
+  garmentRadios.forEach(function(radio) {
+    radio.addEventListener('change', function() {
+      if (this.value === 'manual') {
+        garmentManualDiv.style.display = 'block';
+      } else {
+        garmentManualDiv.style.display = 'none';
+        manualGarmentFile = null;
+        garmentPreviewDiv.innerHTML = '';
+      }
+    });
+  });
+
+  if (garmentFileInput) {
+    garmentFileInput.addEventListener('change', function() {
+      var file = garmentFileInput.files[0];
+      if (file) {
+        if (file.size > 10 * 1024 * 1024) {
+          alert('Garment photo must be under 10 MB.');
+          garmentFileInput.value = '';
+          return;
+        }
+        manualGarmentFile = file;
+        garmentPreviewDiv.innerHTML = '';
+        var img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+        img.alt = 'Garment photo preview';
+        img.style.maxWidth = '120px';
+        img.style.borderRadius = '8px';
+        img.style.marginTop = '8px';
+        garmentPreviewDiv.appendChild(img);
+      }
+    });
+  }
 
   /* --- Drag & Drop --- */
   dropzone.addEventListener('click', function(e) {
@@ -298,9 +455,10 @@
   fileInput.addEventListener('change', function() { handleFiles(fileInput.files); });
 
   function handleFiles(files) {
-    var newFiles = Array.from(files).slice(0, 3 - selectedFiles.length);
+    var maxFiles = isBulkMode ? 20 : 3;
+    var newFiles = Array.from(files).slice(0, maxFiles - selectedFiles.length);
     newFiles.forEach(function(file) {
-      if (selectedFiles.length >= 3) return;
+      if (selectedFiles.length >= maxFiles) return;
       if (file.size > 10 * 1024 * 1024) {
         alert(file.name + ' is larger than 10 MB.');
         return;
@@ -308,6 +466,7 @@
       selectedFiles.push(file);
     });
     renderPreviews();
+    updateSubmitButton();
   }
 
   function renderPreviews() {
@@ -325,23 +484,30 @@
       removeBtn.addEventListener('click', function() {
         selectedFiles.splice(idx, 1);
         renderPreviews();
+        updateSubmitButton();
       });
       wrap.appendChild(img);
       wrap.appendChild(removeBtn);
+      if (isBulkMode) {
+        var flabel = document.createElement('div');
+        flabel.style.cssText = 'font-size:10px;color:#888;text-align:center;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100px;';
+        flabel.textContent = file.name;
+        wrap.appendChild(flabel);
+      }
       previews.appendChild(wrap);
     });
   }
 
   /* --- Progress Animation --- */
   var progressSteps = [
-    { pct: 8, text: 'Uploading images...' },
-    { pct: 20, text: 'AI analyzing product photos...' },
-    { pct: 35, text: 'Generating product name, description & tags...' },
-    { pct: 50, text: 'Creating 4-pose model grid...' },
-    { pct: 62, text: 'Splitting grid into 2 halves...' },
-    { pct: 75, text: 'Upscaling both halves...' },
-    { pct: 88, text: 'Cropping into 4 final poses...' },
-    { pct: 95, text: 'Preparing preview...' },
+    { pct: 10, text: 'Uploading images...' },
+    { pct: 25, text: 'AI analyzing garment photos...' },
+    { pct: 40, text: 'Generating product name, description & tags...' },
+    { pct: 55, text: 'Creating 6-pose model lookbook grid...' },
+    { pct: 70, text: 'This takes 15-30s depending on quality...' },
+    { pct: 82, text: 'Cropping hero image & building collage...' },
+    { pct: 92, text: 'Almost done — preparing preview...' },
+    { pct: 95, text: 'Finalizing...' },
   ];
 
   function animateProgress() {
@@ -365,9 +531,10 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  /* --- STEP 1: SUBMIT FORM → GET PREVIEW --- */
+  /* --- SUBMIT FORM --- */
   form.addEventListener('submit', function(e) {
     e.preventDefault();
+    if (isBulkMode) { handleBulkSubmit(); return; }
     if (selectedFiles.length === 0) { alert('Please upload at least 1 photo.'); return; }
     var checkedSizes = form.querySelectorAll('input[name="sizes"]:checked');
     if (checkedSizes.length === 0) { alert('Please select at least one size.'); return; }
@@ -384,8 +551,18 @@
     fd.append('name', form.querySelector('#pookie-name').value);
     fd.append('description', form.querySelector('#pookie-description').value);
     fd.append('category', form.querySelector('#pookie-category').value);
+    fd.append('status', form.querySelector('#pookie-status').value);
     fd.append('extra_prompt', form.querySelector('#pookie-extra-prompt').value);
+    fd.append('image_quality', form.querySelector('#pookie-image-quality').value);
+    fd.append('quantity', form.querySelector('#pookie-quantity').value);
     fd.append('use_my_description', document.getElementById('pookie-use-my-desc').checked ? 'true' : 'false');
+
+    /* Garment photo option */
+    var garmentOption = form.querySelector('input[name="garment_photo_option"]:checked');
+    fd.append('garment_photo_option', garmentOption ? garmentOption.value : 'auto');
+    if (garmentOption && garmentOption.value === 'manual' && manualGarmentFile) {
+      fd.append('garment_photo', manualGarmentFile);
+    }
 
     showScreen('progress');
     progressFill.style.width = '5%';
@@ -477,7 +654,8 @@
     var fields = [
       ['Type', ai.garment_type], ['Color', ai.color],
       ['Fabric', ai.fabric], ['Style', ai.dress_style],
-      ['Occasion', ai.occasion]
+      ['Occasion', ai.occasion], ['Persona', ai.target_persona],
+      ['Styling Tip', ai.styling_tip]
     ];
     fields.forEach(function(f) {
       if (f[1]) {
@@ -493,6 +671,14 @@
       '<strong>Collections:</strong> ' + (p.collections && p.collections.length ? p.collections.join(', ') : 'None') + '<br>' +
       '<strong>SEO Title:</strong> ' + (p.seo_title || '') + '<br>' +
       '<strong>Meta:</strong> ' + (p.seo_description || '');
+
+    /* Set editable status dropdown */
+    var statusDropdown = document.getElementById('pookie-preview-status');
+    if (statusDropdown) statusDropdown.value = p.status || 'DRAFT';
+
+    /* Set editable quantity */
+    var qtyInput = document.getElementById('pookie-preview-quantity');
+    if (qtyInput) qtyInput.value = p.quantity || 1;
   }
 
   /* --- Description toggle helpers (exposed on window for onclick) --- */
@@ -549,6 +735,9 @@
       seo_title: previewData.seo_title,
       seo_description: previewData.seo_description,
       product_type: previewData.product_type,
+      status: document.getElementById('pookie-preview-status').value || previewData.status || 'DRAFT',
+      category: previewData.category || '',
+      quantity: parseInt(document.getElementById('pookie-preview-quantity').value) || 1,
       sizes: previewData.sizes,
       price: previewData.price,
       compare_at_price: previewData.compare_at_price,
@@ -567,6 +756,12 @@
         confirmBtn.textContent = 'Create Product on Shopify';
 
         if (data.success) {
+          var sr = document.getElementById('pookie-single-result');
+          var br = document.getElementById('pookie-bulk-results');
+          if (sr) sr.style.display = '';
+          if (br) br.style.display = 'none';
+          document.querySelector('.pookie-creator__success-icon').textContent = '\u2705';
+          document.querySelector('.pookie-creator__success h2').textContent = 'Product Created Successfully!';
           showScreen('success');
           document.getElementById('pookie-success-name').textContent = data.product_name || 'Product';
           document.getElementById('pookie-admin-link').href = data.admin_url || '#';
@@ -590,13 +785,175 @@
       });
   };
 
+  /* ====================================================================
+     BULK UPLOAD \u2014 each image = 1 product
+     ==================================================================== */
+  function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+
+  async function handleBulkSubmit() {
+    if (selectedFiles.length === 0) { alert('Please upload at least 1 photo.'); return; }
+    var checkedSizes = form.querySelectorAll('input[name="sizes"]:checked');
+    if (checkedSizes.length === 0) { alert('Please select at least one size.'); return; }
+    if (!BACKEND_URL) { alert('Backend URL not configured.'); return; }
+    var sizes = [];
+    checkedSizes.forEach(function(cb) { sizes.push(cb.value); });
+
+    /* Collect shared form values once */
+    var sharedFields = {
+      price: form.querySelector('#pookie-price').value,
+      compare_at_price: form.querySelector('#pookie-compare-price').value,
+      sizes: sizes.join(','),
+      name: form.querySelector('#pookie-name').value,
+      description: form.querySelector('#pookie-description').value,
+      category: form.querySelector('#pookie-category').value,
+      status: form.querySelector('#pookie-status').value,
+      extra_prompt: form.querySelector('#pookie-extra-prompt').value,
+      image_quality: form.querySelector('#pookie-image-quality').value,
+      quantity: form.querySelector('#pookie-quantity').value,
+      use_my_description: document.getElementById('pookie-use-my-desc').checked ? 'true' : 'false',
+      garment_photo_option: (form.querySelector('input[name="garment_photo_option"]:checked') || {}).value || 'auto'
+    };
+
+    var total = selectedFiles.length;
+    showScreen('progress');
+    progressFill.style.width = '0%';
+    progressText.textContent = 'Starting bulk creation (' + total + ' products)\u2026';
+    var results = [], succeeded = 0, failed = 0;
+
+    for (var i = 0; i < total; i++) {
+      var fname = selectedFiles[i].name;
+
+      /* ---- Step 1: Preview (AI text + 6-pose grid) ---- */
+      progressText.textContent = '(' + (i + 1) + '/' + total + ') \uD83C\uDFA8 Generating AI images: ' + fname + '\u2026';
+      progressFill.style.width = Math.round(((i + 0.2) / total) * 100) + '%';
+
+      var fd = new FormData();
+      fd.append('images', selectedFiles[i]);
+      Object.keys(sharedFields).forEach(function(k) { fd.append(k, sharedFields[k]); });
+      if (sharedFields.garment_photo_option === 'manual' && manualGarmentFile) {
+        fd.append('garment_photo', manualGarmentFile);
+      }
+
+      var previewOk = false, confirmOk = false, productData = null;
+      try {
+        var prevRes = await fetch(BACKEND_URL + '?action=preview', { method: 'POST', body: fd });
+        var prevData = await prevRes.json();
+        if (!prevData.success || !prevData.preview) {
+          throw new Error(prevData.error || 'AI generation failed');
+        }
+        previewOk = true;
+
+        /* ---- Step 2: Confirm (upload + create on Shopify) ---- */
+        progressText.textContent = '(' + (i + 1) + '/' + total + ') \uD83D\uDED2 Creating on Shopify: ' + (prevData.preview.product_name || fname) + '\u2026';
+        progressFill.style.width = Math.round(((i + 0.7) / total) * 100) + '%';
+
+        var payload = {
+          product_name: prevData.preview.product_name,
+          description_html: prevData.preview.description_html,
+          tags: prevData.preview.tags,
+          seo_title: prevData.preview.seo_title,
+          seo_description: prevData.preview.seo_description,
+          product_type: prevData.preview.product_type,
+          status: 'DRAFT', /* Bulk always creates as Draft for review */
+          category: prevData.preview.category || sharedFields.category,
+          quantity: parseInt(sharedFields.quantity) || 1,
+          sizes: prevData.preview.sizes,
+          price: prevData.preview.price,
+          compare_at_price: prevData.preview.compare_at_price,
+          collections: prevData.preview.collections,
+          images: prevData.preview.images
+        };
+
+        var confRes = await fetch(BACKEND_URL + '?action=confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        var confData = await confRes.json();
+        if (!confData.success) {
+          throw new Error(confData.error || 'Shopify creation failed');
+        }
+        confirmOk = true;
+        productData = confData;
+        succeeded++;
+        results.push(confData);
+
+      } catch (err) {
+        failed++;
+        var stage = previewOk ? 'Shopify creation' : 'AI generation';
+        var errMsg = err.message || 'Unknown error';
+        /* Show user-friendly rate-limit message */
+        if (errMsg.indexOf('429') !== -1 || errMsg.toLowerCase().indexOf('rate') !== -1) {
+          errMsg = 'API rate limit hit \u2014 please try again with fewer products or wait a few minutes.';
+        } else if (errMsg.indexOf('timeout') !== -1 || errMsg.indexOf('Timeout') !== -1) {
+          errMsg = 'Request timed out \u2014 the server took too long to respond.';
+        } else if (errMsg.indexOf('NetworkError') !== -1 || errMsg.indexOf('Failed to fetch') !== -1) {
+          errMsg = 'Network error \u2014 check your internet connection.';
+        }
+        results.push({ success: false, error: stage + ': ' + errMsg, filename: fname });
+      }
+
+      progressFill.style.width = Math.round(((i + 1) / total) * 100) + '%';
+
+      /* 3-second delay between products to avoid API rate limits */
+      if (i < total - 1) {
+        progressText.textContent = '(' + (i + 1) + '/' + total + ') \u2705 Done \u2014 waiting 3s before next\u2026';
+        await sleep(3000);
+      }
+    }
+
+    progressText.textContent = 'Done! ' + succeeded + ' created' + (failed > 0 ? ', ' + failed + ' failed' : '') + '.';
+    renderBulkSuccess(results, succeeded, failed, total);
+    showScreen('success');
+  }
+
+  function renderBulkSuccess(results, succeeded, failed, total) {
+    var sr = document.getElementById('pookie-single-result');
+    var br = document.getElementById('pookie-bulk-results');
+    if (sr) sr.style.display = 'none';
+    if (br) br.style.display = 'block';
+    var icon = document.querySelector('.pookie-creator__success-icon');
+    var heading = document.querySelector('.pookie-creator__success h2');
+    if (icon) icon.textContent = failed === 0 ? '\u2705' : '\u26A0\uFE0F';
+    if (heading) heading.textContent = succeeded + ' of ' + total + ' Products Created' + (failed === 0 ? '!' : '');
+    var html = '';
+    results.forEach(function(r, idx) {
+      if (r.success) {
+        html += '<div class="pookie-bulk-item pookie-bulk-item--ok">'
+          + '<span class="pookie-bulk-num">' + (idx + 1) + '</span>'
+          + '<span class="pookie-bulk-name">' + r.product_name + '</span>'
+          + '<span class="pookie-bulk-links">'
+          + '<a href="' + r.admin_url + '" target="_blank">Admin</a>'
+          + '<a href="' + r.product_url + '" target="_blank">Store</a>'
+          + '</span></div>';
+      } else {
+        html += '<div class="pookie-bulk-item pookie-bulk-item--fail">'
+          + '<span class="pookie-bulk-num">' + (idx + 1) + '</span>'
+          + '<span class="pookie-bulk-name">' + (r.filename || 'Unknown') + '</span>'
+          + '<span class="pookie-bulk-error">\u274C ' + (r.error || 'Failed') + '</span></div>';
+      }
+    });
+    if (br) br.innerHTML = html;
+  }
+
   /* --- Create Another --- */
   document.getElementById('pookie-create-another').addEventListener('click', function() {
     previewData = null;
+    isBulkMode = false;
+    if (bulkToggle) bulkToggle.checked = false;
+    if (bulkLabel) bulkLabel.textContent = 'Single Product';
+    var uploadHint = document.getElementById('pookie-upload-hint');
+    if (uploadHint) uploadHint.textContent = 'Upload 1-3 photos (phone camera, hanger, flat-lay, mannequin)';
+    var dropzoneHint = document.getElementById('pookie-dropzone-hint');
+    if (dropzoneHint) dropzoneHint.textContent = 'JPG, PNG \u2014 max 10 MB each \u2014 up to 3 photos';
     showScreen('form');
     form.reset();
     selectedFiles = [];
+    manualGarmentFile = null;
     previews.innerHTML = '';
+    if (garmentPreviewDiv) garmentPreviewDiv.innerHTML = '';
+    if (garmentManualDiv) garmentManualDiv.style.display = 'none';
+    updateSubmitButton();
   });
 
   /* --- Retry --- */

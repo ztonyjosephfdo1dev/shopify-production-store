@@ -376,3 +376,193 @@
     align-items: center;
   }
 }
+
+/* --- Garment Photo Radio Group --- */
+.pookie-creator__radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.pookie-creator__radio-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: #333;
+  cursor: pointer;
+  padding: 8px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.pookie-creator__radio-label:hover {
+  border-color: #b0b0b0;
+  background: #fafafa;
+}
+
+.pookie-creator__radio-input {
+  accent-color: #e91e8c;
+  width: 16px;
+  height: 16px;
+}
+
+.pookie-creator__radio-input:checked + span {
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.pookie-creator__file-input-inline {
+  display: block;
+  font-size: 13px;
+  padding: 8px;
+  border: 1px dashed #ccc;
+  border-radius: 6px;
+  width: 100%;
+  cursor: pointer;
+}
+
+.pookie-creator__garment-preview {
+  margin-top: 8px;
+}
+
+/* --- Bulk Upload Toggle Switch --- */
+.pookie-creator__bulk-toggle {
+  background: #f8f8f8;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+}
+
+.pookie-creator__switch-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.pookie-creator__switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.pookie-creator__switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.pookie-creator__switch-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: #ccc;
+  border-radius: 26px;
+  transition: 0.3s;
+}
+
+.pookie-creator__switch-slider::before {
+  content: '';
+  position: absolute;
+  height: 20px;
+  width: 20px;
+  left: 3px;
+  bottom: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: 0.3s;
+}
+
+.pookie-creator__switch input:checked + .pookie-creator__switch-slider {
+  background: #b08968;
+}
+
+.pookie-creator__switch input:checked + .pookie-creator__switch-slider::before {
+  transform: translateX(22px);
+}
+
+.pookie-creator__switch-text {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+/* --- Bulk Results List --- */
+.pookie-bulk-results {
+  text-align: left;
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid #eee;
+  border-radius: 10px;
+  margin-top: 16px;
+}
+
+.pookie-bulk-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 14px;
+}
+
+.pookie-bulk-item:last-child {
+  border-bottom: none;
+}
+
+.pookie-bulk-item--ok {
+  background: #fff;
+}
+
+.pookie-bulk-item--fail {
+  background: #fff5f5;
+}
+
+.pookie-bulk-num {
+  font-weight: 700;
+  color: #888;
+  min-width: 24px;
+}
+
+.pookie-bulk-name {
+  flex: 1;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pookie-bulk-links {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.pookie-bulk-links a {
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.pookie-bulk-links a:first-child {
+  background: #1a1a1a;
+  color: #fff;
+}
+
+.pookie-bulk-links a:last-child {
+  background: #b08968;
+  color: #fff;
+}
+
+.pookie-bulk-error {
+  font-size: 12px;
+  color: #e53935;
+}

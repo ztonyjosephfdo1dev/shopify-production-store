@@ -35,34 +35,47 @@ This document describes the logical architecture of the Shopify storefront, the 
 - GitHub Actions: optional hook to deploy built/packaged theme to Shopify via Shopify CLI.
 - External services (optional): analytics, payment gateways, fulfillment providers.
 
-## AI Product Creation Tool (v2.0)
+## AI Product Creation Tool (v6 — current)
 
 An admin-only Shopify page with a simple upload form. Backend runs on Google Cloud Functions (permanently free).
 
 ### Architecture
 ```
-Shopify Admin Page → Google Cloud Function (Python 3.11) → AI Services → Shopify GraphQL API
+Shopify Admin Page → Google Cloud Function (Python 3.12) → OpenAI APIs → PIL (local) → Shopify GraphQL API
 ```
 
 ### Components
-- **Frontend:** Shopify Liquid section (`pookie-product-creator.liquid`) — vanilla JS + CSS, no external frameworks
-- **Backend:** Google Cloud Function (Python 3.11, HTTP trigger) — serverless, permanently free tier
-- **AI Vision + Text:** GPT-4.1-nano — single call: analyzes image + generates name, description, 35-50 tags, SEO, detects category/color/fabric
-- **BG Removal:** Photoroom API — removes background, creates white BG + styled AI background (preserves real product)
-- **Virtual Try-On:** Replicate VTON (prunaai/p-tryon or omnious/vella-1.5) — maps real garment onto Indian model
-- **Shopify Client:** GraphQL Admin API v2026-01 — creates products with images, variants, tags, collection assignment
+- **Frontend:** `pookie-product-creator.liquid` — vanilla JS + CSS, no frameworks. Quality dropdown (low/medium/high), drag-drop upload, two-step preview/confirm flow
+- **Backend:** Google Cloud Function (Python 3.12, HTTP trigger, 512MB, 300s timeout, `asia-south1`)
+- **AI Text:** gpt-4o-mini → gpt-4.1-nano → gpt-3.5-turbo (cascade fallback) — generates name, description, 35-50 tags, SEO, `model_prompt`, `styling_tip`, `target_persona`
+- **AI Image:** gpt-image-1-mini (OpenAI Responses API) — generates a single 1024×1536 image containing a **2×3 grid of 6 model poses** in one API call. Model and bottom wear are consistent across all 6 panels
+- **Image Processing:** PIL (local, zero cost) — crops 2×3 grid into hero (panel 1, front view) + 6-panel lookbook collage
+- **Provider Adapter:** `image_provider.py` — `IMAGE_PROVIDER` env var selects `openai` (default) | `fashn` (stub) | `replicate` (legacy stub)
+- **Shopify Client:** GraphQL Admin API v2026-01 — staged uploads, product creation, variant creation, inventory, collection assignment
 
 ### Data Flow
-1. Staff uploads 1-3 raw phone photos + enters price/sizes (category optional)
-2. GPT-4.1-nano analyzes image → generates ALL text + detects garment attributes (one API call)
-3. Photoroom removes BG → white background (Image 1) + styled background (Image 2)
-4. Replicate VTON → garment on model (Image 3)
-5. Raw photo crop → detail/close-up (Image 4)
-6. Tool creates Shopify product via GraphQL (status: Draft)
+1. Staff uploads 1-3 raw phone photos + enters price, sizes, quality (optional: category, description, styling notes)
+2. **Step 1 — Text** (1 OpenAI call ~$0.0003): GPT analyzes garment → generates ALL text + `model_prompt` (scene description for image generation) + `styling_tip` + `target_persona`
+3. **Step 2 — Image** (1 OpenAI call ~$0.015 medium): gpt-image-1-mini generates 6-pose grid — same model, same bottom wear, same background across all poses
+4. **Step 3 — Crop** (local PIL, $0.00): grid cropped into hero + 6-panel collage
+5. **Preview returned** to browser (2 images + all text, not yet on Shopify)
+6. Staff reviews, edits name/description/status, clicks Confirm
+7. **Confirm** — images uploaded to Shopify staged storage → product created → variants → inventory → collection assignment
 
-**Cost:** ~₹12/product | Hosting: ₹0/month (GCP free tier — permanent)
+### Cost Per Product
+| Step | Service | Cost |
+|---|---|---|
+| Text analysis | gpt-4o-mini | ~$0.0003 |
+| Image generation (medium) | gpt-image-1-mini | ~$0.015 |
+| Grid crop + collage | PIL local | $0.00 |
+| **Total** | **2 API calls** | **~$0.016 (~₹1.3)** |
 
-See `docs/product-creation-tool.md` for full HLD v2.0 and requirements.
+### Provider Adapter — Future Swap
+- `IMAGE_PROVIDER=fashn` → switches to FASHN.ai ($0.075/image, purpose-built fashion)
+- `IMAGE_PROVIDER=openai` → current default
+- `IMAGE_MODEL=gpt-image-1.5` → upgrade to higher quality model (no code change)
+
+See `docs/product-creation-tool.md` for full HLD v3.0 and requirements.
 
 ---
 

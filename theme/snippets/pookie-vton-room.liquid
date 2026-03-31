@@ -1,0 +1,870 @@
+{% comment %}
+  Pookie Mirror — Virtual Try-On Room (v1)
+  Global snippet: rendered on every page via theme.liquid
+  Features:
+    - Floating FAB button with cart badge
+    - Slide-over drawer (sidebar desktop, bottom sheet mobile)
+    - Customer photo manager (3 slots, persisted in localStorage)
+    - Outfit builder (upper + bottom OR full outfit slots from cart)
+    - Animated 6-panel fashion show with audio
+{% endcomment %}
+
+{{ 'pookie-vton-room.css' | asset_url | stylesheet_tag }}
+
+<!-- Floating Action Button -->
+<button class="pm-fab" id="pm-fab" aria-label="Open Pookie Mirror" title="✨ Try it on!">
+  ✨
+  <span class="pm-fab__badge" id="pm-fab-badge"></span>
+</button>
+
+<!-- Backdrop -->
+<div class="pm-backdrop" id="pm-backdrop"></div>
+
+<!-- Drawer -->
+<div class="pm-drawer" id="pm-drawer" role="dialog" aria-label="Pookie Mirror">
+  <div class="pm-drawer__header">
+    <div class="pm-drawer__title">✨ Pookie Mirror</div>
+    <button class="pm-drawer__close" id="pm-close" aria-label="Close">&times;</button>
+  </div>
+  <div class="pm-drawer__body" id="pm-body">
+    <!-- Dynamic content rendered by JS -->
+  </div>
+  <div class="pm-drawer__footer" id="pm-footer"></div>
+</div>
+
+<!-- Hidden file input for photo upload -->
+<input type="file" id="pm-file-input" accept="image/*" style="display:none">
+
+<script>
+(function() {
+  'use strict';
+
+  /* ================================================================
+     CONFIG
+     ================================================================ */
+  const CLOUD_FN = 'https://asia-south1-pookie-style-automation.cloudfunctions.net/create-product';
+  const MAX_PHOTOS = 3;
+  const MAX_TRYONS_PER_SESSION = 5;
+  const SLIDESHOW_INTERVAL = 1000; // ms per panel — fast fashion show energy
+  const PHOTO_STORAGE_KEY = 'pookie_mirror_photos';
+  const TRYON_COUNT_KEY = 'pookie_mirror_tryon_count';
+
+  // Fashion quotes shown during loading (rotating every 4s)
+  const FASHION_QUOTES = [
+    { text: 'Fashion is the armor to survive the reality of everyday life.', by: 'Bill Cunningham' },
+    { text: 'Style is a way to say who you are without having to speak.', by: 'Rachel Zoe' },
+    { text: 'Dress like you\'re already famous.', by: '' },
+    { text: 'Life is too short to wear boring clothes.', by: '' },
+    { text: 'In order to be irreplaceable, one must always be different.', by: 'Coco Chanel' },
+    { text: 'You can have anything you want in life if you dress for it.', by: 'Edith Head' },
+    { text: 'Main character energy loading…', by: '' },
+    { text: 'Fashion is instant language.', by: 'Miuccia Prada' },
+    { text: 'Elegance is not about being noticed, it\'s about being remembered.', by: 'Giorgio Armani' },
+    { text: 'Your vibe attracts your tribe — dress accordingly.', by: '' },
+    { text: 'Creativity is the greatest rebellion in existence.', by: 'Virgil Abloh' },
+    { text: 'Dress like the CEO you\'re becoming.', by: '' },
+    { text: 'What you wear is how you present yourself to the world.', by: 'Vera Wang' },
+    { text: 'Slay first, adult later.', by: '' },
+    { text: 'Fashion fades, only style remains the same.', by: 'Coco Chanel' },
+  ];
+
+  /* ================================================================
+     STATE
+     ================================================================ */
+  const state = {
+    open: false,
+    screen: 'builder',  // 'builder' | 'loading' | 'result'
+    photos: [],          // [{id, dataUrl}] — max 3
+    selectedPhotoIdx: -1,
+    cartItems: [],       // [{id, title, image, url, garment_category, garment_brief, product_id, variant_id}]
+    outfitSlots: { upper: null, lower: null, full: null },
+    panels: [],          // base64 strings of result panels
+    currentPanel: 0,
+    slideshowTimer: null,
+    quoteInterval: null,  // rotating quotes timer during loading
+    gridLoading: false,   // true while grid panels are still loading
+    audioPlaying: false,
+    tryonCount: 0,
+    // If opened from product page with a pre-loaded item
+    preloadItem: null,
+  };
+
+  /* ================================================================
+     DOM REFS
+     ================================================================ */
+  const fab = document.getElementById('pm-fab');
+  const badge = document.getElementById('pm-fab-badge');
+  const backdrop = document.getElementById('pm-backdrop');
+  const drawer = document.getElementById('pm-drawer');
+  const closeBtn = document.getElementById('pm-close');
+  const body = document.getElementById('pm-body');
+  const footer = document.getElementById('pm-footer');
+  const fileInput = document.getElementById('pm-file-input');
+
+  /* ================================================================
+     INIT
+     ================================================================ */
+  function init() {
+    loadPhotos();
+    loadTryonCount();
+    fetchCart();
+    bindEvents();
+    updateBadge();
+
+    // Check if product page has a try-on preload
+    const preload = window.__pookieMirrorPreload;
+    if (preload) {
+      state.preloadItem = preload;
+    }
+  }
+
+  function bindEvents() {
+    fab.addEventListener('click', toggleDrawer);
+    backdrop.addEventListener('click', closeDrawer);
+    closeBtn.addEventListener('click', closeDrawer);
+    fileInput.addEventListener('change', handleFileSelect);
+
+    // Listen for custom event from product page "Try This On" button
+    document.addEventListener('pookie-mirror:open', (e) => {
+      if (e.detail) state.preloadItem = e.detail;
+      openDrawer();
+    });
+
+    // Re-fetch cart when items change
+    document.addEventListener('cart:updated', fetchCart);
+
+    // Escape key closes drawer
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && state.open) closeDrawer();
+    });
+  }
+
+  /* ================================================================
+     DRAWER OPEN / CLOSE
+     ================================================================ */
+  function toggleDrawer() { state.open ? closeDrawer() : openDrawer(); }
+
+  function openDrawer() {
+    state.open = true;
+    backdrop.classList.add('pm-backdrop--open');
+    drawer.classList.add('pm-drawer--open');
+    document.body.style.overflow = 'hidden';
+    fetchCart().then(() => {
+      // Auto-assign preloaded product to a slot
+      if (state.preloadItem) {
+        autoAssignToSlot(state.preloadItem);
+        state.preloadItem = null;
+      }
+      render();
+    });
+  }
+
+  function closeDrawer() {
+    state.open = false;
+    backdrop.classList.remove('pm-backdrop--open');
+    drawer.classList.remove('pm-drawer--open');
+    document.body.style.overflow = '';
+    stopSlideshow();
+  }
+
+  /* ================================================================
+     CART FETCH
+     ================================================================ */
+  async function fetchCart() {
+    try {
+      const resp = await fetch('/cart.js');
+      const cart = await resp.json();
+      state.cartItems = (cart.items || []).map(item => ({
+        id: item.id,
+        title: item.product_title || item.title,
+        image: item.image ? item.image.replace(/(\.\w+)\?/, '_400x$1?') : '',
+        url: item.url,
+        variant_id: item.variant_id,
+        product_id: item.product_id,
+        product_image_3d: '',  // Will be fetched from product page
+        // These will be populated from metafields if available
+        garment_category: item.properties?._garment_category || 'full_body',
+        garment_brief: item.properties?._garment_brief || item.product_title || '',
+        garment_design_details: item.properties?._garment_design_details || '',
+      }));
+      // Fetch garment photo URLs from product pages (for clean garment reference)
+      for (const cartItem of state.cartItems) {
+        if (cartItem.url) {
+          try {
+            // Strip query params (e.g. ?variant=...) before appending .json
+            const cleanUrl = cartItem.url.split('?')[0];
+            const prodResp = await fetch(cleanUrl + '.json');
+            const prodJson = await prodResp.json();
+            const images = prodJson.product?.images || [];
+            // Try by alt text first (new products), then by filename (all products)
+            let realImg = images.find(img => img.alt && img.alt.toLowerCase().includes('garment photo'));
+            if (!realImg) realImg = images.find(img => img.src && img.src.includes('garment-real'));
+            if (realImg && realImg.src) {
+              cartItem.product_image_3d = realImg.src;
+              console.log('[PookieMirror] Cart item garment photo found:', cartItem.title, realImg.src);
+            } else {
+              console.warn('[PookieMirror] No garment-real image found for', cartItem.title, 'images:', images.length);
+            }
+          } catch (e) {
+            console.warn('[PookieMirror] Product fetch failed for', cartItem.title, e);
+          }
+        }
+      }
+      updateBadge();
+    } catch (e) {
+      console.warn('[PookieMirror] Cart fetch failed:', e);
+    }
+  }
+
+  function updateBadge() {
+    const count = state.cartItems.length;
+    badge.textContent = count > 0 ? count : '';
+  }
+
+  /* ================================================================
+     PHOTO MANAGER (localStorage persistence)
+     ================================================================ */
+  function loadPhotos() {
+    try {
+      const raw = localStorage.getItem(PHOTO_STORAGE_KEY);
+      state.photos = raw ? JSON.parse(raw) : [];
+      if (state.photos.length > 0) state.selectedPhotoIdx = 0;
+    } catch { state.photos = []; }
+  }
+
+  function savePhotos() {
+    try {
+      localStorage.setItem(PHOTO_STORAGE_KEY, JSON.stringify(state.photos));
+    } catch (e) {
+      console.warn('[PookieMirror] Photo save failed:', e);
+    }
+  }
+
+  function addPhoto(dataUrl) {
+    if (state.photos.length >= MAX_PHOTOS) {
+      alert(`Maximum ${MAX_PHOTOS} photos. Remove one first.`);
+      return;
+    }
+    const id = 'photo_' + Date.now();
+    state.photos.push({ id, dataUrl });
+    state.selectedPhotoIdx = state.photos.length - 1;
+    savePhotos();
+    render();
+  }
+
+  function removePhoto(idx) {
+    state.photos.splice(idx, 1);
+    if (state.selectedPhotoIdx >= state.photos.length) {
+      state.selectedPhotoIdx = state.photos.length - 1;
+    }
+    savePhotos();
+    render();
+  }
+
+  function selectPhoto(idx) {
+    state.selectedPhotoIdx = idx;
+    render();
+  }
+
+  function handleFileSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    // Resize to max 1024px to save localStorage space
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1024;
+        let { width: w, height: h } = img;
+        if (Math.max(w, h) > MAX) {
+          const s = MAX / Math.max(w, h);
+          w = Math.round(w * s);
+          h = Math.round(h * s);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        addPhoto(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+    fileInput.value = '';
+  }
+
+  /* ================================================================
+     OUTFIT SLOTS
+     ================================================================ */
+  function assignToSlot(slotKey, cartItem) {
+    // If assigning to "full", clear upper+lower
+    if (slotKey === 'full') {
+      state.outfitSlots.upper = null;
+      state.outfitSlots.lower = null;
+    }
+    // If assigning to upper/lower, clear full
+    if (slotKey === 'upper' || slotKey === 'lower') {
+      state.outfitSlots.full = null;
+    }
+    state.outfitSlots[slotKey] = cartItem;
+    render();
+  }
+
+  function removeFromSlot(slotKey) {
+    state.outfitSlots[slotKey] = null;
+    render();
+  }
+
+  function autoAssignToSlot(item) {
+    const cat = (item.garment_category || '').toLowerCase();
+    if (cat.includes('upper')) assignToSlot('upper', item);
+    else if (cat.includes('lower')) assignToSlot('lower', item);
+    else assignToSlot('full', item);
+  }
+
+  function getAssignedItemIds() {
+    const ids = new Set();
+    Object.values(state.outfitSlots).forEach(item => {
+      if (item) ids.add(item.id);
+    });
+    return ids;
+  }
+
+  function getSelectedGarments() {
+    const garments = [];
+    const slots = state.outfitSlots;
+    if (slots.full) {
+      garments.push(slots.full);
+    } else {
+      if (slots.upper) garments.push(slots.upper);
+      if (slots.lower) garments.push(slots.lower);
+    }
+    return garments;
+  }
+
+  /* ================================================================
+     TRY-ON COUNT (session limit)
+     ================================================================ */
+  function loadTryonCount() {
+    state.tryonCount = parseInt(sessionStorage.getItem(TRYON_COUNT_KEY) || '0', 10);
+  }
+  function incrementTryonCount() {
+    state.tryonCount++;
+    sessionStorage.setItem(TRYON_COUNT_KEY, state.tryonCount.toString());
+  }
+
+  /* ================================================================
+     GENERATE TRY-ON
+     ================================================================ */
+  async function generateTryon() {
+    if (state.tryonCount >= MAX_TRYONS_PER_SESSION) {
+      alert('You have used all your free try-ons for this session. Come back later! 💕');
+      return;
+    }
+    if (state.selectedPhotoIdx < 0 || !state.photos[state.selectedPhotoIdx]) {
+      alert('Please select or upload a photo first.');
+      return;
+    }
+    const garments = getSelectedGarments();
+    if (garments.length === 0) {
+      alert('Please add at least one garment to your outfit.');
+      return;
+    }
+
+    state.screen = 'loading';
+    state.gridLoading = true;
+    render();
+
+    const personDataUrl = state.photos[state.selectedPhotoIdx].dataUrl;
+    const personB64 = personDataUrl.split(',')[1];
+
+    // Bulletproof: for any garment missing product_image_3d, fetch it now
+    for (const g of garments) {
+      if (!g.product_image_3d && g.url) {
+        try {
+          const cleanUrl = g.url.split('?')[0];
+          console.log('[PookieMirror] Fetching garment-real for', g.title, 'from', cleanUrl + '.json');
+          const resp = await fetch(cleanUrl + '.json');
+          const prodJson = await resp.json();
+          const images = prodJson.product?.images || [];
+          // Try by alt text first (new products), then by filename (all products)
+          let realImg = images.find(img => img.alt && img.alt.toLowerCase().includes('garment photo'));
+          if (!realImg) realImg = images.find(img => img.src && img.src.includes('garment-real'));
+          if (realImg && realImg.src) {
+            g.product_image_3d = realImg.src;
+            console.log('[PookieMirror] Found garment-real for', g.title, ':', realImg.src);
+          } else {
+            // Fallback: use .js endpoint (simpler array of URL strings)
+            const jsResp = await fetch(cleanUrl + '.js');
+            const jsData = await jsResp.json();
+            if (jsData.images) {
+              const realUrl = jsData.images.find(u => u.includes('garment-real'));
+              if (realUrl) {
+                g.product_image_3d = realUrl.startsWith('//') ? 'https:' + realUrl : realUrl;
+                console.log('[PookieMirror] Found garment-real via .js for', g.title);
+              } else {
+                console.warn('[PookieMirror] NO garment-real in any images for', g.title, jsData.images);
+              }
+            }
+          }
+        } catch (e) {
+          console.error('[PookieMirror] Garment-real fetch FAILED for', g.title, e);
+        }
+      }
+    }
+
+    const garmentPayload = garments.map(g => ({
+      image_url: g.image || '',
+      garment_brief: g.garment_brief || g.title || 'Fashion garment',
+      garment_category: g.garment_category || 'full_body',
+      garment_design_details: g.garment_design_details || '',
+      product_image_3d: g.product_image_3d || '',
+    }));
+
+    // Debug logging
+    garmentPayload.forEach((g, i) => {
+      console.log(`[PookieMirror] Garment ${i+1}: image_url=${g.image_url ? 'YES' : 'EMPTY'}, product_image_3d=${g.product_image_3d ? 'YES' : 'EMPTY'}`);
+      if (g.product_image_3d) console.log(`[PookieMirror] Garment ${i+1} 3D URL: ${g.product_image_3d}`);
+    });
+
+    const payload = JSON.stringify({
+      person_image: personB64,
+      garments: garmentPayload,
+      tryon_mode: 'customer_editorial',
+      quality: 'medium',
+    });
+
+    const fetchOpts = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+    };
+
+    // Single grid call — generates 6-panel lookbook
+    try {
+      const gridData = await fetch(CLOUD_FN + '?action=tryon_grid', fetchOpts)
+        .then(r => r.json());
+
+      _clearQuoteInterval();
+      state.gridLoading = false;
+
+      if (gridData.success && gridData.panels && gridData.panels.length > 0) {
+        state.panels = gridData.panels;
+        state.currentPanel = 0;
+        state.screen = 'result';
+        incrementTryonCount();
+        render();
+        startSlideshow();
+        _autoStartAudio();
+        console.log(`[PookieMirror] Grid: ${gridData.panels.length} panels`);
+      } else {
+        throw new Error(gridData.error || 'Generation failed');
+      }
+    } catch (e) {
+      _clearQuoteInterval();
+      state.gridLoading = false;
+      console.warn('[PookieMirror] Grid failed:', e);
+      alert('Try-on generation failed. Please try again.');
+      state.screen = 'builder';
+      render();
+    }
+  }
+
+  // Append new panels to a running slideshow (called when grid arrives)
+  function appendPanels(newPanelB64s) {
+    const stage = body.querySelector('.pm-show__stage');
+    const dotsContainer = body.querySelector('.pm-show__dots');
+    if (!stage || !dotsContainer) return;
+
+    newPanelB64s.forEach((b64, i) => {
+      const idx = state.panels.length;
+      state.panels.push(b64);
+
+      // Append panel DOM
+      const panelDiv = document.createElement('div');
+      panelDiv.className = 'pm-show__panel';
+      panelDiv.innerHTML = `<img src="data:image/jpeg;base64,${b64}" alt="Look ${idx+1}">`;
+      // Insert before overlay elements
+      const overlay = stage.querySelector('.pm-show__overlay-top');
+      stage.insertBefore(panelDiv, overlay);
+
+      // Append dot
+      const dot = document.createElement('button');
+      dot.className = 'pm-show__dot';
+      dot.onclick = () => window._pm.goToPanel(idx);
+      dotsContainer.appendChild(dot);
+    });
+
+    // Update counter text
+    const counter = body.querySelector('.pm-show__counter');
+    if (counter) counter.textContent = `${state.currentPanel + 1} / ${state.panels.length}`;
+  }
+
+  function _clearQuoteInterval() {
+    if (state.quoteInterval) {
+      clearInterval(state.quoteInterval);
+      state.quoteInterval = null;
+    }
+  }
+
+  /* ================================================================
+     SLIDESHOW
+     ================================================================ */
+  /* ---- Cinematic slideshow with Ken Burns + slide transitions ---- */
+  const TRANSITION_EFFECTS = ['zoomIn', 'zoomOut', 'panLeft', 'panRight', 'panUp', 'slideLeft', 'slideRight', 'fadeZoom'];
+
+  function _randomEffect() {
+    return TRANSITION_EFFECTS[Math.floor(Math.random() * TRANSITION_EFFECTS.length)];
+  }
+
+  function startSlideshow() {
+    stopSlideshow();
+    // Assign initial effect to current panel
+    _applyEffect(state.currentPanel);
+    state.slideshowTimer = setInterval(() => {
+      state.currentPanel = (state.currentPanel + 1) % state.panels.length;
+      updateSlideshow();
+    }, SLIDESHOW_INTERVAL);
+  }
+
+  function stopSlideshow() {
+    if (state.slideshowTimer) {
+      clearInterval(state.slideshowTimer);
+      state.slideshowTimer = null;
+    }
+  }
+
+  function goToPanel(idx) {
+    state.currentPanel = idx;
+    updateSlideshow();
+    startSlideshow();
+  }
+
+  function _applyEffect(idx) {
+    const panels = body.querySelectorAll('.pm-show__panel');
+    if (!panels[idx]) return;
+    // Remove old effect classes
+    panels.forEach(p => {
+      TRANSITION_EFFECTS.forEach(fx => p.classList.remove('pm-fx-' + fx));
+    });
+    // Apply new random effect
+    panels[idx].classList.add('pm-fx-' + _randomEffect());
+  }
+
+  function updateSlideshow() {
+    const panels = body.querySelectorAll('.pm-show__panel');
+    const dots = body.querySelectorAll('.pm-show__dot');
+    const counter = body.querySelector('.pm-show__counter');
+    panels.forEach((p, i) => {
+      const wasActive = p.classList.contains('pm-show__panel--active');
+      p.classList.toggle('pm-show__panel--active', i === state.currentPanel);
+      // When this panel becomes active, give it a new animation
+      if (!wasActive && i === state.currentPanel) _applyEffect(i);
+    });
+    dots.forEach((d, i) => d.classList.toggle('pm-show__dot--active', i === state.currentPanel));
+    if (counter) counter.textContent = `${state.currentPanel + 1} / ${state.panels.length}`;
+  }
+
+  /* ================================================================
+     AUDIO — Velvet Haze runway track
+     ================================================================ */
+  let _audioEl = null;
+
+  function _ensureAudio() {
+    if (_audioEl) return _audioEl;
+    _audioEl = new Audio({{ 'pookie-vton-music.mp3' | asset_url | json }});
+    _audioEl.loop = true;
+    _audioEl.volume = 0.5;
+    _audioEl.preload = 'auto';
+    return _audioEl;
+  }
+
+  function toggleAudio() {
+    const el = _ensureAudio();
+    if (state.audioPlaying) {
+      state.audioPlaying = false;
+      el.pause();
+    } else {
+      state.audioPlaying = true;
+      el.play().catch(() => {});
+    }
+    const btn = body.querySelector('.pm-show__audio-btn');
+    if (btn) btn.textContent = state.audioPlaying ? '🔊' : '🔇';
+  }
+
+  function _autoStartAudio() {
+    if (!state.audioPlaying) {
+      state.audioPlaying = true;
+      const el = _ensureAudio();
+      el.play().catch(() => {});
+    }
+  }
+
+  /* ================================================================
+     DOWNLOAD CURRENT PANEL
+     ================================================================ */
+  function downloadCurrentPanel() {
+    if (!state.panels[state.currentPanel]) return;
+    const a = document.createElement('a');
+    a.href = 'data:image/jpeg;base64,' + state.panels[state.currentPanel];
+    a.download = `pookie-mirror-look-${state.currentPanel + 1}.jpg`;
+    a.click();
+  }
+
+  /* ================================================================
+     RENDER — Declarative UI based on state
+     ================================================================ */
+  function render() {
+    if (state.screen === 'loading') return renderLoading();
+    if (state.screen === 'result') return renderResult();
+    renderBuilder();
+  }
+
+  function renderBuilder() {
+    const assignedIds = getAssignedItemIds();
+    const hasFullOutfit = !!state.outfitSlots.full;
+    const hasPartial = !!state.outfitSlots.upper || !!state.outfitSlots.lower;
+    const hasPhoto = state.selectedPhotoIdx >= 0;
+    const hasGarment = getSelectedGarments().length > 0;
+    const canGenerate = hasPhoto && hasGarment && state.tryonCount < MAX_TRYONS_PER_SESSION;
+
+    let html = '';
+
+    // ---- Photo section ----
+    html += '<p class="pm-section-title">📸 Your Photo</p>';
+    html += '<div class="pm-photos">';
+    for (let i = 0; i < MAX_PHOTOS; i++) {
+      const photo = state.photos[i];
+      const selected = i === state.selectedPhotoIdx;
+      if (photo) {
+        html += `
+          <div class="pm-photos__slot pm-photos__slot--filled ${selected ? 'pm-photos__slot--selected' : ''}"
+               onclick="window._pm.selectPhoto(${i})">
+            <img src="${photo.dataUrl}" alt="Photo ${i+1}">
+            <button class="pm-photos__remove" onclick="event.stopPropagation(); window._pm.removePhoto(${i})">&times;</button>
+          </div>`;
+      } else {
+        html += `
+          <div class="pm-photos__slot" onclick="document.getElementById('pm-file-input').click()">
+            <span class="pm-photos__add-icon">+</span>
+          </div>`;
+      }
+    }
+    html += '</div>';
+
+    // ---- Outfit slots ----
+    html += '<p class="pm-section-title">👗 Your Outfit</p>';
+    html += '<div class="pm-outfit">';
+
+    // Upper slot
+    const upper = state.outfitSlots.upper;
+    html += `<div class="pm-outfit__slot ${upper ? 'pm-outfit__slot--filled' : ''} ${hasFullOutfit ? 'pm-outfit__slot--disabled' : ''}">
+      <span class="pm-outfit__slot-icon">👕</span>
+      <div class="pm-outfit__slot-info">
+        <div class="pm-outfit__slot-label">Upper</div>
+        <div class="pm-outfit__slot-name">${upper ? upper.title : 'Tap an item below'}</div>
+      </div>
+      ${upper ? `<img class="pm-outfit__slot-thumb" src="${upper.image}" alt="">
+        <button class="pm-outfit__slot-remove" onclick="window._pm.removeSlot('upper')">&times;</button>` : ''}
+    </div>`;
+
+    // Lower slot
+    const lower = state.outfitSlots.lower;
+    html += `<div class="pm-outfit__slot ${lower ? 'pm-outfit__slot--filled' : ''} ${hasFullOutfit ? 'pm-outfit__slot--disabled' : ''}">
+      <span class="pm-outfit__slot-icon">👖</span>
+      <div class="pm-outfit__slot-info">
+        <div class="pm-outfit__slot-label">Bottom</div>
+        <div class="pm-outfit__slot-name">${lower ? lower.title : 'Tap an item below'}</div>
+      </div>
+      ${lower ? `<img class="pm-outfit__slot-thumb" src="${lower.image}" alt="">
+        <button class="pm-outfit__slot-remove" onclick="window._pm.removeSlot('lower')">&times;</button>` : ''}
+    </div>`;
+
+    // Full outfit slot
+    const full = state.outfitSlots.full;
+    html += `<div class="pm-outfit__slot ${full ? 'pm-outfit__slot--filled' : ''} ${hasPartial ? 'pm-outfit__slot--disabled' : ''}">
+      <span class="pm-outfit__slot-icon">👗</span>
+      <div class="pm-outfit__slot-info">
+        <div class="pm-outfit__slot-label">Full Outfit</div>
+        <div class="pm-outfit__slot-name">${full ? full.title : 'Or pick a dress / set'}</div>
+      </div>
+      ${full ? `<img class="pm-outfit__slot-thumb" src="${full.image}" alt="">
+        <button class="pm-outfit__slot-remove" onclick="window._pm.removeSlot('full')">&times;</button>` : ''}
+    </div>`;
+    html += '</div>';
+
+    // ---- Cart items tray ----
+    if (state.cartItems.length > 0) {
+      html += '<p class="pm-section-title">🛒 From Your Cart</p>';
+      html += '<div class="pm-tray">';
+      state.cartItems.forEach((item, i) => {
+        const used = assignedIds.has(item.id);
+        html += `
+          <div class="pm-tray__item ${used ? 'pm-tray__item--used' : ''}" onclick="window._pm.trayTap(${i})">
+            <img class="pm-tray__item-img" src="${item.image}" alt="${item.title}">
+            <div class="pm-tray__item-name">${item.title}</div>
+          </div>`;
+      });
+      html += '</div>';
+    } else {
+      html += '<div class="pm-empty"><div class="pm-empty__icon">🛒</div>Your cart is empty.<br>Add items to try them on!</div>';
+    }
+
+    body.innerHTML = html;
+
+    // ---- Generate button in footer (always visible, never scrolls away) ----
+    const remaining = MAX_TRYONS_PER_SESSION - state.tryonCount;
+    let footerHtml = '';
+    if (remaining <= 0) {
+      footerHtml = `<div class="pm-limit-notice" style="margin:0;border-radius:0;"><p class="pm-limit-notice__text">
+        You've used all ${MAX_TRYONS_PER_SESSION} free try-ons this session. 💕
+      </p></div>`;
+    } else {
+      footerHtml = `<button class="pm-generate" ${canGenerate ? '' : 'disabled'} onclick="window._pm.generate()">
+        ✨ See My Look (${remaining} left)
+      </button>`;
+    }
+    footer.innerHTML = footerHtml;
+    footer.style.display = '';
+  }
+
+  function renderLoading() {
+    footer.innerHTML = '';
+    footer.style.display = 'none';
+
+    // Pick a random starting quote
+    const startIdx = Math.floor(Math.random() * FASHION_QUOTES.length);
+    const q = FASHION_QUOTES[startIdx];
+    const quoteHtml = q.by ? `"${q.text}"<br><span class="pm-quote__author">— ${q.by}</span>` : `"${q.text}"`;
+
+    body.innerHTML = `
+      <div class="pm-loading pm-loading--fullscreen">
+        <div class="pm-loading__shimmer"></div>
+        <div class="pm-loading__text">
+          <span class="pm-loading__spinner">✨</span> Creating your fashion show...
+        </div>
+        <div class="pm-quote" id="pm-quote">${quoteHtml}</div>
+        <small class="pm-loading__sub">Your look is being styled (15-30 seconds)</small>
+      </div>`;
+
+    // Rotate quotes every 4 seconds
+    let quoteIdx = startIdx;
+    _clearQuoteInterval();
+    state.quoteInterval = setInterval(() => {
+      quoteIdx = (quoteIdx + 1) % FASHION_QUOTES.length;
+      const nq = FASHION_QUOTES[quoteIdx];
+      const el = document.getElementById('pm-quote');
+      if (!el) return;
+      el.classList.add('pm-quote--fade-out');
+      setTimeout(() => {
+        el.innerHTML = nq.by ? `"${nq.text}"<br><span class="pm-quote__author">— ${nq.by}</span>` : `"${nq.text}"`;
+        el.classList.remove('pm-quote--fade-out');
+      }, 400);
+    }, 4000);
+  }
+
+  function renderResult() {
+    footer.innerHTML = '';
+    footer.style.display = 'none';
+    let html = '<div class="pm-show pm-show--fullscreen">';
+
+    // Edge-to-edge stage
+    html += '<div class="pm-show__stage pm-show__stage--full">';
+    state.panels.forEach((b64, i) => {
+      html += `<div class="pm-show__panel ${i === state.currentPanel ? 'pm-show__panel--active' : ''}">
+        <img src="data:image/jpeg;base64,${b64}" alt="Look ${i+1}">
+      </div>`;
+    });
+
+    // Overlay controls inside the stage
+    html += `<div class="pm-show__overlay-top">
+      <div class="pm-show__counter">${state.currentPanel + 1} / ${state.panels.length}</div>
+      <button class="pm-show__audio-btn pm-show__audio-btn--overlay" onclick="window._pm.toggleAudio()">${state.audioPlaying ? '🔊' : '🔇'}</button>
+    </div>`;
+
+    // "Loading more looks..." badge (shown while grid is still loading)
+    if (state.gridLoading) {
+      html += '<div class="pm-show__loading-badge"><span class="pm-loading__spinner">✨</span> Loading more looks...</div>';
+    }
+
+    // Dots at bottom of stage
+    html += '<div class="pm-show__overlay-bottom">';
+    html += '<div class="pm-show__dots">';
+    state.panels.forEach((_, i) => {
+      html += `<button class="pm-show__dot ${i === state.currentPanel ? 'pm-show__dot--active' : ''}" onclick="window._pm.goToPanel(${i})"></button>`;
+    });
+    html += '</div>';
+    html += '</div>';
+
+    html += '</div>'; // stage
+
+    // Action bar pinned at bottom
+    html += `<div class="pm-show__action-bar">
+      <button class="pm-show__action" onclick="window._pm.download()">📥 Save</button>
+      <button class="pm-show__action pm-show__action--primary" onclick="window._pm.tryAgain()">🔄 Try Again</button>
+    </div>`;
+
+    html += '</div>';
+    body.innerHTML = html;
+  }
+
+  /* ================================================================
+     TRAY TAP — Smart slot assignment
+     ================================================================ */
+  function trayTap(cartIdx) {
+    const item = state.cartItems[cartIdx];
+    if (!item) return;
+
+    const cat = (item.garment_category || '').toLowerCase();
+
+    // Smart assignment based on category
+    if (cat.includes('lower') || cat.includes('bottom') || cat.includes('plazo') || cat.includes('skirt')) {
+      assignToSlot('lower', item);
+    } else if (cat.includes('full') || cat.includes('dress') || cat.includes('gown') || cat.includes('kurti-set') || cat.includes('cord-set') || cat.includes('maxi') || cat.includes('single')) {
+      assignToSlot('full', item);
+    } else {
+      // Default: upper body (tops, shirts, kurtis, blouses, etc.)
+      assignToSlot('upper', item);
+    }
+  }
+
+  /* ================================================================
+     TRY AGAIN — Reset to builder
+     ================================================================ */
+  function tryAgain() {
+    stopSlideshow();
+    state.screen = 'builder';
+    state.panels = [];
+    state.currentPanel = 0;
+    render();
+  }
+
+  /* ================================================================
+     PUBLIC API (for onclick handlers in rendered HTML)
+     ================================================================ */
+  window._pm = {
+    selectPhoto,
+    removePhoto,
+    removeSlot: removeFromSlot,
+    trayTap,
+    generate: generateTryon,
+    goToPanel,
+    toggleAudio,
+    download: downloadCurrentPanel,
+    tryAgain,
+    // Programmatic open with preloaded item
+    openWith(item) {
+      state.preloadItem = item;
+      openDrawer();
+    },
+  };
+
+  /* ================================================================
+     BOOT
+     ================================================================ */
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>

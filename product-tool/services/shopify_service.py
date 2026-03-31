@@ -83,6 +83,217 @@ def _graphql(query: str, variables: dict = None, _retry: bool = True) -> dict:
     return data.get("data", {})
 
 
+# ---- Taxonomy & Inventory helpers (best-effort, non-blocking) ----
+
+_taxonomy_cache: dict = {}
+
+
+def _resolve_taxonomy_id(category: str, garment_type: str) -> str | None:
+    """
+    Best-effort Shopify Standard Product Taxonomy lookup.
+    Queries the taxonomy search API. Returns None if no match.
+    Product creation proceeds without category on failure.
+    """
+    KEYWORD_MAP = {
+        # Category handles
+        "kurti": "Kurta", "kurti-set": "Kurta", "suits": "Suits",
+        "indo-western": "Dresses", "top-wear": "Shirts & Tops",
+        "tops": "Shirts & Tops", "casual-top": "Shirts & Tops",
+        "korean-top": "Shirts & Tops", "shirt": "Shirts & Tops",
+        "blouse": "Shirts & Tops", "bodycon": "Dresses",
+        "fancy-crop-top": "Shirts & Tops", "single-piece": "Dresses",
+        "gown": "Dresses", "maxi": "Dresses", "casual-maxi": "Dresses",
+        "cord-set": "Clothing Sets", "bottom": "Pants",
+        "plazo": "Pants", "skirt": "Skirts", "inners": "Underwear",
+        "skin-care": "Skin Care", "face-wash": "Skin Care",
+        "body-lotion": "Skin Care",
+        # Detected garment types (from OpenAI)
+        "crop top": "Shirts & Tops", "crop-top": "Shirts & Tops",
+        "top": "Shirts & Tops", "t-shirt": "Shirts & Tops",
+        "dress": "Dresses", "palazzo": "Pants",
+    }
+
+    key = (category or "").lower().strip()
+    keyword = KEYWORD_MAP.get(key, "")
+    if not keyword and garment_type:
+        keyword = KEYWORD_MAP.get(garment_type.lower().strip(), "")
+    if not keyword:
+        return None
+
+    if keyword in _taxonomy_cache:
+        return _taxonomy_cache[keyword]
+
+    try:
+        data = _graphql(
+            "query($q:String!){taxonomy{categories(first:1,search:$q){nodes{id name fullName}}}}",
+            {"q": keyword},
+        )
+        nodes = data.get("taxonomy", {}).get("categories", {}).get("nodes", [])
+        if nodes:
+            tid = nodes[0]["id"]
+            _taxonomy_cache[keyword] = tid
+            print(f"[shopify] Taxonomy: '{keyword}' \u2192 {nodes[0].get('fullName','')} ({tid})")
+            return tid
+        print(f"[shopify] No taxonomy match for '{keyword}'")
+    except Exception as e:
+        print(f"[shopify] Taxonomy lookup skipped: {e}")
+    return None
+
+
+_location_cache: dict = {"id": None}
+
+
+def _get_default_location() -> str | None:
+    """Get the store's first (default) inventory location. Cached per instance."""
+    if _location_cache["id"]:
+        return _location_cache["id"]
+    try:
+        # Only query 'id' — 'name' requires read_locations scope
+        data = _graphql("{ locations(first:1) { nodes { id } } }")
+        nodes = data.get("locations", {}).get("nodes", [])
+        if nodes:
+            _location_cache["id"] = nodes[0]["id"]
+            print(f"[shopify] Default location: {nodes[0]['id']}")
+            return _location_cache["id"]
+    except Exception as e:
+        print(f"[shopify] Location lookup failed: {e}")
+    return None
+
+
+def _activate_and_set_inventory(variant_nodes: list, quantity: int = 1) -> None:
+    """
+    Enable inventory tracking + set quantities at the default location.
+    Shopify creates products with tracked=false by default, so we must:
+    1. Enable tracking on each inventory item (inventoryItemUpdate)
+    2. Set quantity via inventorySetQuantities with ignoreCompareQuantity=true
+    """
+    location_id = _get_default_location()
+    if not location_id:
+        print("[shopify] Skipping inventory — no location found")
+        return
+
+    # Collect inventory item IDs
+    inv_items = []
+    for v in variant_nodes:
+        inv_item = v.get("inventoryItem", {})
+        inv_id = inv_item.get("id") if inv_item else None
+        if inv_id:
+            inv_items.append(inv_id)
+
+    if not inv_items:
+        print("[shopify] Skipping inventory — no inventory item IDs")
+        return
+
+    # Step 1: Enable tracking on each inventory item
+    for inv_id in inv_items:
+        try:
+            track_data = _graphql(
+                """mutation invTrack($id: ID!, $input: InventoryItemInput!) {
+                    inventoryItemUpdate(id: $id, input: $input) {
+                        inventoryItem { id tracked }
+                        userErrors { field message }
+                    }
+                }""",
+                {"id": inv_id, "input": {"tracked": True}},
+            )
+            track_errors = track_data.get("inventoryItemUpdate", {}).get("userErrors", [])
+            if track_errors:
+                print(f"[shopify] Tracking enable errors for {inv_id}: {json.dumps(track_errors)}")
+            else:
+                print(f"[shopify] Tracking enabled: {inv_id} ✓")
+        except Exception as e:
+            print(f"[shopify] Tracking enable failed for {inv_id}: {e}")
+
+    # Step 2: Set quantities
+    quantities = []
+    for inv_id in inv_items:
+        quantities.append({
+            "inventoryItemId": inv_id,
+            "locationId": location_id,
+            "quantity": quantity,
+        })
+
+    try:
+        data = _graphql(
+            """mutation inventorySet($input: InventorySetQuantitiesInput!) {
+                inventorySetQuantities(input: $input) {
+                    inventoryAdjustmentGroup { changes { name delta } }
+                    userErrors { field message }
+                }
+            }""",
+            {
+                "input": {
+                    "name": "available",
+                    "reason": "correction",
+                    "ignoreCompareQuantity": True,
+                    "quantities": quantities,
+                }
+            },
+        )
+        errors = data.get("inventorySetQuantities", {}).get("userErrors", [])
+        if errors:
+            print(f"[shopify] Inventory set errors: {json.dumps(errors)}")
+        else:
+            print(f"[shopify] Inventory set: {len(quantities)} items × {quantity} units ✓")
+    except Exception as e:
+        print(f"[shopify] Inventory set failed (non-fatal): {e}")
+
+
+def _publish_to_channels(product_gid: str) -> None:
+    """
+    Publish a product to all available sales channels (publications).
+    Queries all publications and publishes the product to each one.
+    Best-effort: logs failures but doesn't block product creation.
+    """
+    try:
+        # Query all available publications (sales channels)
+        pub_data = _graphql(
+            """query {
+                publications(first: 50) {
+                    nodes {
+                        id
+                        name
+                    }
+                }
+            }"""
+        )
+        publications = pub_data.get("publications", {}).get("nodes", [])
+        if not publications:
+            print("[shopify] No publications found — skipping channel publish")
+            return
+
+        print(f"[shopify] Found {len(publications)} publications: {[p.get('name','?') for p in publications]}")
+
+        # Build publication inputs for publishablePublish
+        publication_inputs = [{"publicationId": p["id"]} for p in publications]
+
+        publish_data = _graphql(
+            """mutation publishProduct($id: ID!, $input: [PublicationInput!]!) {
+                publishablePublish(id: $id, input: $input) {
+                    publishable {
+                        ... on Product {
+                            id
+                            title
+                        }
+                    }
+                    userErrors {
+                        field
+                        message
+                    }
+                }
+            }""",
+            {"id": product_gid, "input": publication_inputs},
+        )
+        pub_errors = publish_data.get("publishablePublish", {}).get("userErrors", [])
+        if pub_errors:
+            print(f"[shopify] Publish errors (non-fatal): {json.dumps(pub_errors)}")
+        else:
+            print(f"[shopify] Published to {len(publications)} channels successfully")
+
+    except Exception as e:
+        print(f"[shopify] Channel publish failed (non-fatal): {e}")
+
+
 def upload_image_to_shopify(image_bytes: bytes, filename: str, alt_text: str = "") -> str | None:
     """
     Upload an image to Shopify via staged uploads.
@@ -180,6 +391,8 @@ def create_product(
     seo_title: str = "",
     seo_description: str = "",
     status: str = "DRAFT",
+    category: str = "",
+    inventory_quantity: int = 1,
 ) -> dict:
     """
     Create a Shopify product with variants, images, tags, and SEO.
@@ -193,7 +406,7 @@ def create_product(
         sizes: list of size strings (S, M, L, etc.)
         price: selling price
         compare_at_price: original/compare price
-        media_ids: list of staged upload resource URLs
+        media_ids: list of (resource_url, alt_text) tuples or plain URL strings
         seo_title: SEO title
         seo_description: meta description
         status: ACTIVE or DRAFT
@@ -203,15 +416,20 @@ def create_product(
     """
     # Build media from staged upload URLs
     media = []
-    for url in media_ids:
+    for item in media_ids:
+        if isinstance(item, tuple):
+            url, alt = item
+        else:
+            url, alt = item, title
         media.append(
             {
                 "originalSource": url,
+                "alt": alt,
                 "mediaContentType": "IMAGE",
             }
         )
 
-    # Step 1: Create product WITHOUT variants (removed from ProductCreateInput in API v2024-01+)
+    # Step 1: Create product WITH productOptions (auto-creates variants per size)
     create_mutation = """
     mutation productCreate($product: ProductCreateInput!, $media: [CreateMediaInput!]) {
         productCreate(product: $product, media: $media) {
@@ -220,6 +438,15 @@ def create_product(
                 handle
                 title
                 status
+                variants(first: 30) {
+                    nodes {
+                        id
+                        title
+                        inventoryItem {
+                            id
+                        }
+                    }
+                }
             }
             userErrors {
                 field
@@ -246,6 +473,9 @@ def create_product(
         "media": media,
     }
 
+    # Resolve taxonomy ID for later (set via productUpdate after creation)
+    taxonomy_id = _resolve_taxonomy_id(category, product_type)
+
     data = _graphql(create_mutation, create_variables)
     result = data.get("productCreate", {})
 
@@ -257,40 +487,86 @@ def create_product(
     product_gid = product.get("id", "")
     numeric_id = product_gid.split("/")[-1] if product_gid else ""
 
-    # Step 2: Create variants separately via productVariantsBulkCreate (required in API v2024-01+)
-    variants_input = []
-    for size in sizes:
-        variants_input.append(
-            {
-                "optionValues": [{"optionName": "Size", "name": size}],
+    # Set product category via productCategoryUpdate (dedicated mutation for API v2026-01)
+    if taxonomy_id and product_gid:
+        try:
+            _graphql(
+                """mutation productUpdate($product: ProductUpdateInput!) {
+                    productUpdate(product: $product) {
+                        product { id }
+                        userErrors { field message }
+                    }
+                }""",
+                {
+                    "product": {
+                        "id": product_gid,
+                        "productCategory": {
+                            "productTaxonomyNodeId": taxonomy_id,
+                        },
+                    }
+                },
+            )
+            print(f"[shopify] Product category set: {taxonomy_id}")
+        except Exception as e:
+            print(f"[shopify] Product category set failed (non-fatal): {e}")
+
+    # Step 2: Update variants with correct price/compareAtPrice
+    # (productCreate with productOptions auto-creates variants at $0.00;
+    #  we must update them, not re-create them)
+    variant_nodes = product.get("variants", {}).get("nodes", [])
+    if not variant_nodes:
+        print("[shopify] WARNING: No auto-created variants found in productCreate response")
+    else:
+        variants_update_input = []
+        for v in variant_nodes:
+            variants_update_input.append({
+                "id": v["id"],
                 "price": str(price),
                 "compareAtPrice": str(compare_at_price),
-            }
-        )
+            })
 
-    variants_mutation = """
-    mutation productVariantsBulkCreate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-        productVariantsBulkCreate(productId: $productId, variants: $variants) {
-            productVariants {
-                id
-                title
-                price
-            }
-            userErrors {
-                field
-                message
+        update_mutation = """
+        mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+            productVariantsBulkUpdate(productId: $productId, variants: $variants) {
+                productVariants {
+                    id
+                    title
+                    price
+                    compareAtPrice
+                    inventoryItem {
+                        id
+                    }
+                }
+                userErrors {
+                    field
+                    message
+                }
             }
         }
-    }
-    """
+        """
 
-    variants_data = _graphql(variants_mutation, {
-        "productId": product_gid,
-        "variants": variants_input,
-    })
-    variant_errors = variants_data.get("productVariantsBulkCreate", {}).get("userErrors", [])
-    if variant_errors:
-        print(f"Variant creation errors (non-fatal): {json.dumps(variant_errors)}")
+        variants_data = _graphql(update_mutation, {
+            "productId": product_gid,
+            "variants": variants_update_input,
+        })
+        variant_result = variants_data.get("productVariantsBulkUpdate", {})
+        variant_errors = variant_result.get("userErrors", [])
+        if variant_errors:
+            raise Exception(f"Variant update errors: {json.dumps(variant_errors)}")
+
+        # Use the updated variant nodes (they have correct inventoryItem IDs)
+        updated_nodes = variant_result.get("productVariants", [])
+        if updated_nodes:
+            variant_nodes = updated_nodes
+        print(f"[shopify] Variants updated: {len(variant_nodes)} variants with price={price}, compareAt={compare_at_price}")
+
+    # Step 3: Activate inventory at location + set quantities
+    if variant_nodes and inventory_quantity > 0:
+        _activate_and_set_inventory(variant_nodes, inventory_quantity)
+
+    # Step 4: Publish to all sales channels
+    if product_gid:
+        _publish_to_channels(product_gid)
 
     return {
         "product_id": product_gid,
@@ -366,4 +642,136 @@ def assign_to_collections(product_id: str, collection_id: str) -> bool:
         return True
     except Exception as e:
         print(f"Collection assign error: {e}")
+        return False
+
+
+# ---- Product Metafields (for Pookie Mirror virtual try-on) ----
+
+def set_product_metafields(product_gid: str, metafields: list[dict]) -> bool:
+    """
+    Set metafields on a product using metafieldsSet mutation.
+    Idempotent — creates or updates.
+
+    Args:
+        product_gid: product GID (e.g. "gid://shopify/Product/123")
+        metafields: list of dicts with keys: namespace, key, value, type
+            Example: [
+                {"namespace": "pookie", "key": "garment_brief", "value": "Red cotton kurti...", "type": "single_line_text_field"},
+                {"namespace": "pookie", "key": "garment_category", "value": "upper_body", "type": "single_line_text_field"},
+            ]
+
+    Returns:
+        True if all metafields were set successfully
+    """
+    mutation = """
+    mutation metafieldsSet($metafields: [MetafieldsSetInput!]!) {
+        metafieldsSet(metafields: $metafields) {
+            metafields {
+                id
+                namespace
+                key
+                value
+            }
+            userErrors {
+                field
+                message
+            }
+        }
+    }
+    """
+
+    mf_input = []
+    for mf in metafields:
+        mf_input.append({
+            "ownerId": product_gid,
+            "namespace": mf.get("namespace", "pookie"),
+            "key": mf["key"],
+            "value": str(mf["value"]),
+            "type": mf.get("type", "single_line_text_field"),
+        })
+
+    try:
+        data = _graphql(mutation, {"metafields": mf_input})
+        result = data.get("metafieldsSet", {})
+        errors = result.get("userErrors", [])
+        if errors:
+            print(f"[shopify] Metafield errors: {json.dumps(errors)}")
+            return False
+        set_mfs = result.get("metafields", [])
+        print(f"[shopify] Metafields set: {len(set_mfs)} on {product_gid}")
+        return True
+    except Exception as e:
+        print(f"[shopify] Metafield set failed (non-fatal): {e}")
+        return False
+
+
+def get_product_metafields(product_gid: str, namespace: str = "pookie") -> dict:
+    """
+    Read all metafields for a product under a given namespace.
+
+    Returns:
+        dict mapping key → value, e.g. {"garment_brief": "Red cotton kurti...", "garment_category": "upper_body"}
+    """
+    query = """
+    query productMetafields($id: ID!, $namespace: String!) {
+        product(id: $id) {
+            metafields(first: 20, namespace: $namespace) {
+                nodes {
+                    key
+                    value
+                }
+            }
+        }
+    }
+    """
+
+    try:
+        data = _graphql(query, {"id": product_gid, "namespace": namespace})
+        nodes = data.get("product", {}).get("metafields", {}).get("nodes", [])
+        return {n["key"]: n["value"] for n in nodes}
+    except Exception as e:
+        print(f"[shopify] Metafield read failed: {e}")
+        return {}
+
+
+def set_customer_metafield(customer_gid: str, key: str, value: str, mf_type: str = "json") -> bool:
+    """
+    Set a single metafield on a customer (for storing try-on photo URLs).
+
+    Args:
+        customer_gid: customer GID (e.g. "gid://shopify/Customer/123")
+        key: metafield key (e.g. "tryon_photos")
+        value: JSON string (for json type) or plain string
+        mf_type: metafield type (default "json")
+
+    Returns:
+        True if successful
+    """
+    mutation = """
+    mutation metafieldsSet($metafields: [MetafieldsSetInput!]!) {
+        metafieldsSet(metafields: $metafields) {
+            metafields { id key value }
+            userErrors { field message }
+        }
+    }
+    """
+
+    try:
+        data = _graphql(mutation, {
+            "metafields": [{
+                "ownerId": customer_gid,
+                "namespace": "pookie",
+                "key": key,
+                "value": value,
+                "type": mf_type,
+            }]
+        })
+        errors = data.get("metafieldsSet", {}).get("userErrors", [])
+        if errors:
+            print(f"[shopify] Customer metafield errors: {json.dumps(errors)}")
+            return False
+        print(f"[shopify] Customer metafield '{key}' set on {customer_gid}")
+        return True
+    except Exception as e:
+        print(f"[shopify] Customer metafield failed: {e}")
         return False
