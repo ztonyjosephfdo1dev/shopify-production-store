@@ -69,3 +69,30 @@
   3. `image_provider.py` — Removed identity-lock early-return in `generate_tryon_grid()`. Now feeds BOTH the 3D garment image (primary garment reference) AND the customer photo into a single Gemini call that generates all 6 diverse editorial poses. Prompt instructs: 3D shot = garment fidelity source, customer = identity source.
   4. `image_provider.py` — Cleaned bottom-focus styling logic from `generate_tryon_single()` accessory instructions.
 - **Status:** ✅ FIXED & DEPLOYED
+
+### 9. Panel 6 shows only FRONT — need FRONT + BACK for virtual try-on reference
+- **Date:** March 30, 2026
+- **Symptom:** Panel 6 (3D product shot) only showed the front view of the garment on a mannequin. Virtual try-on needed both front and back as a clean garment reference.
+- **Root cause:** Panel 6 prompt only requested "FRONT VIEW" of the garment. No back view existed in the grid.
+- **Fix (3 files):**
+  1. `image_provider.py` — Panel 6 prompt changed to "FRONT + BACK side-by-side, LEFT HALF = FRONT, RIGHT HALF = BACK" with invisible/floating mannequin (no visible body). All 4 garment types (full, upper, lower, default) updated. Panel 5 reverted from 3D back to walking/movement pose. Slot logic reverted to lock only Panel 6 (`used_slots = {5}`). All grid structure rules and panel layout sections updated.
+  2. `image_utils.py` — `crop_pose_grid()` hardcoded to 2×3 (removed auto-detect via `_count_real_dividers()`). `build_3d_front_back()` simplified to return `panels[5]` directly (Panel 6 already contains front+back).
+  3. `main.py` — No changes needed (wiring from previous issue #8 already correct).
+- **Status:** ✅ FIXED & DEPLOYED
+
+### 10. Bottom wear added to full outfits (dresses, gowns, jumpsuits)
+- **Date:** March 30, 2026
+- **Symptom:** Full outfit products (dresses, gowns, sarees, jumpsuits) got separate bottom wear added in the model_prompt (e.g., "wearing this maxi dress, paired with beige trousers").
+- **Root cause:** `openai_service.py` BOTTOM WEAR rule applied to ALL garments with no exception for full outfits. GPT-4o would dutifully pick bottom wear even for dresses.
+- **Fix:** Added exception to BOTTOM WEAR rule: "If the garment IS a full outfit (dress, gown, jumpsuit, saree, lehenga, cord-set, romper, kurti set, etc.), do NOT add separate bottom wear."
+- **Status:** ✅ FIXED & DEPLOYED
+
+### 11. Beige/sandal-colored bottom wear appearing ~40% of the time
+- **Date:** March 31, 2026
+- **Symptom:** Model images frequently showed beige/khaki/sand-colored trousers regardless of garment color or style.
+- **Root cause:** Both examples in `openai_service.py` prompt used neutral-tone bottoms ("olive paperbag trousers, tan block-heel mules" and "olive cargo pants, tan block heels"). GPT-4o mimicked the example tone, biasing output toward beige/neutral bottoms.
+- **Fix (3 changes in `openai_service.py`):**
+  1. `model_prompt` example changed to "dark charcoal wide-leg trousers, white chunky sneakers"
+  2. `styling_tip` example changed to "black high-waisted cargo pants, white chunky sneakers"
+  3. Added explicit anti-repetition rule: "VARY the bottom color — do NOT always default to beige, khaki, cream, sand, or neutral tones. Match the garment's COLOR and ENERGY."
+- **Status:** ✅ FIXED & DEPLOYED
