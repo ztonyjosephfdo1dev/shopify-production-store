@@ -22,7 +22,7 @@
         {% for block in section.blocks %}
           <span class="pookie-marquee__item" {{ block.shopify_attributes }}>
             {% if block.settings.icon != blank %}
-              <span class="pookie-marquee__icon">{% render 'marquee-icon', icon: block.settings.icon %}</span>
+              <span class="pookie-marquee__icon">{{ block.settings.icon }}</span>
             {% endif %}
             {{ block.settings.text }}
           </span>
@@ -36,7 +36,7 @@
         {% for block in section.blocks %}
           <span class="pookie-marquee__item">
             {% if block.settings.icon != blank %}
-              <span class="pookie-marquee__icon">{% render 'marquee-icon', icon: block.settings.icon %}</span>
+              <span class="pookie-marquee__icon">{{ block.settings.icon }}</span>
             {% endif %}
             {{ block.settings.text }}
           </span>
@@ -87,14 +87,6 @@
 
   .pookie-marquee__icon {
     font-size: 1rem;
-    display: inline-flex;
-    align-items: center;
-    color: #c246dc;
-  }
-  .pookie-marquee__icon svg {
-    width: 18px;
-    height: 18px;
-    filter: drop-shadow(0 0 2px rgba(194, 70, 220, 0.4));
   }
 
   .pookie-marquee__separator {

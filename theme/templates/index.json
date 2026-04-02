@@ -74,35 +74,35 @@
           "type": "message",
           "settings": {
             "text": "Free shipping on ₹999+",
-            "icon": "shipping"
+            "icon": "🚚"
           }
         },
         "msg-2": {
           "type": "message",
           "settings": {
             "text": "New arrivals daily",
-            "icon": "sparkle"
+            "icon": "✨"
           }
         },
         "msg-3": {
           "type": "message",
           "settings": {
             "text": "100% quality guaranteed",
-            "icon": "quality"
+            "icon": "💎"
           }
         },
         "msg-4": {
           "type": "message",
           "settings": {
             "text": "Easy returns & exchange",
-            "icon": "returns"
+            "icon": "↩️"
           }
         },
         "msg-5": {
           "type": "message",
           "settings": {
             "text": "COD available",
-            "icon": "cod"
+            "icon": "💰"
           }
         }
       },
