@@ -95,14 +95,14 @@
           "type": "message",
           "settings": {
             "text": "Easy returns & exchange",
-            "icon": "↩️"
+            "icon": "📦"
           }
         },
         "msg-5": {
           "type": "message",
           "settings": {
             "text": "COD available",
-            "icon": "💰"
+            "icon": "💵"
           }
         }
       },
