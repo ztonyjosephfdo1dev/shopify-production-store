@@ -1,11 +1,12 @@
 {% comment %}
-  Pookie Mirror — Virtual Try-On Room (v1)
+  Pookie Mirror — Virtual Try-On Room (v2)
   Global snippet: rendered on every page via theme.liquid
   Features:
     - Floating FAB button with cart badge
     - Slide-over drawer (sidebar desktop, bottom sheet mobile)
-    - Customer photo manager (3 slots, persisted in localStorage)
-    - Outfit builder (upper + bottom OR full outfit slots from cart)
+    - Customer photo gallery (max 3, select one, persisted in localStorage)
+    - Flexible outfit builder (max 3 garments, any combo: top/bottom/full/layered)
+    - Smart compression (1536px, WebP with JPEG fallback)
     - Animated 6-panel fashion show with audio
 {% endcomment %}
 
@@ -44,9 +45,11 @@
      ================================================================ */
   const CLOUD_FN = 'https://asia-south1-pookie-style-automation.cloudfunctions.net/create-product';
   const MAX_PHOTOS = 3;
+  const MAX_GARMENTS = 3;
   const MAX_TRYONS_PER_SESSION = 5;
   const SLIDESHOW_INTERVAL = 1000; // ms per panel — fast fashion show energy
   const PHOTO_STORAGE_KEY = 'pookie_mirror_photos';
+  const PHOTO_SEL_KEY = 'pookie_mirror_selected';
   const TRYON_COUNT_KEY = 'pookie_mirror_tryon_count';
 
   // Fashion quotes shown during loading (rotating every 4s)
@@ -77,7 +80,7 @@
     photos: [],          // [{id, dataUrl}] — max 3
     selectedPhotoIdx: -1,
     cartItems: [],       // [{id, title, image, url, garment_category, garment_brief, product_id, variant_id}]
-    outfitSlots: { upper: null, lower: null, full: null },
+    outfitGarments: [],  // array of cart items (max 3, any category combo)
     panels: [],          // base64 strings of result panels
     currentPanel: 0,
     slideshowTimer: null,
@@ -187,9 +190,9 @@
     drawer.classList.add('pm-drawer--open');
     document.body.style.overflow = 'hidden';
     fetchCart().then(() => {
-      // Auto-assign preloaded product to a slot
+      // Auto-add preloaded product from product page "Try This On" button
       if (state.preloadItem) {
-        autoAssignToSlot(state.preloadItem);
+        autoAddGarment(state.preloadItem);
         state.preloadItem = null;
       }
       render();
@@ -265,14 +268,25 @@
     try {
       const raw = localStorage.getItem(PHOTO_STORAGE_KEY);
       state.photos = raw ? JSON.parse(raw) : [];
-      if (state.photos.length > 0) state.selectedPhotoIdx = 0;
+      // Restore last-selected photo index
+      const savedIdx = parseInt(localStorage.getItem(PHOTO_SEL_KEY) || '-1', 10);
+      if (savedIdx >= 0 && savedIdx < state.photos.length) {
+        state.selectedPhotoIdx = savedIdx;
+      } else if (state.photos.length > 0) {
+        state.selectedPhotoIdx = state.photos.length - 1; // default to most recent
+      }
     } catch { state.photos = []; }
   }
 
   function savePhotos() {
     try {
       localStorage.setItem(PHOTO_STORAGE_KEY, JSON.stringify(state.photos));
+      localStorage.setItem(PHOTO_SEL_KEY, state.selectedPhotoIdx.toString());
     } catch (e) {
+      // localStorage quota exceeded — suggest removing a photo
+      if (e.name === 'QuotaExceededError' || e.code === 22) {
+        alert('Storage full — please remove a photo to add a new one.');
+      }
       console.warn('[PookieMirror] Photo save failed:', e);
     }
   }
@@ -300,18 +314,38 @@
 
   function selectPhoto(idx) {
     state.selectedPhotoIdx = idx;
+    try { localStorage.setItem(PHOTO_SEL_KEY, idx.toString()); } catch {}
     render();
   }
 
   function handleFileSelect(e) {
     const file = e.target.files[0];
     if (!file) return;
-    // Resize to max 1024px to save localStorage space
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+    if (!validTypes.includes(file.type) && !file.name.match(/\.(jpe?g|png|webp|heic|heif)$/i)) {
+      alert('Please upload a JPEG, PNG, or WebP photo.');
+      fileInput.value = '';
+      return;
+    }
+    // Validate file size (max 20MB raw)
+    if (file.size > 20 * 1024 * 1024) {
+      alert('Photo is too large (max 20MB). Please choose a smaller photo.');
+      fileInput.value = '';
+      return;
+    }
     const reader = new FileReader();
     reader.onload = () => {
       const img = new Image();
       img.onload = () => {
-        const MAX = 1024;
+        // Validate min dimensions
+        if (img.width < 256 || img.height < 256) {
+          alert('Photo is too small (min 256×256px). Please use a higher resolution photo for better results.');
+          fileInput.value = '';
+          return;
+        }
+        // Resize to max 1536px for better VTON identity preservation
+        const MAX = 1536;
         let { width: w, height: h } = img;
         if (Math.max(w, h) > MAX) {
           const s = MAX / Math.max(w, h);
@@ -321,7 +355,11 @@
         const canvas = document.createElement('canvas');
         canvas.width = w; canvas.height = h;
         canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        addPhoto(canvas.toDataURL('image/jpeg', 0.85));
+
+        // Smart compression: try WebP first (smaller), fallback to JPEG
+        _compressCanvas(canvas, function(dataUrl) {
+          addPhoto(dataUrl);
+        });
       };
       img.src = reader.result;
     };
@@ -329,53 +367,71 @@
     fileInput.value = '';
   }
 
+  /** Progressive compression: WebP with JPEG fallback, quality steps until <= 500KB */
+  function _compressCanvas(canvas, callback) {
+    const maxBytes = 500 * 1024; // 500KB target
+    const qualities = [0.82, 0.75, 0.68];
+    // Check WebP support
+    const supportsWebP = canvas.toDataURL('image/webp').startsWith('data:image/webp');
+    const fmt = supportsWebP ? 'image/webp' : 'image/jpeg';
+    for (const q of qualities) {
+      const dataUrl = canvas.toDataURL(fmt, q);
+      const sizeBytes = Math.round((dataUrl.length - dataUrl.indexOf(',') - 1) * 3 / 4);
+      if (sizeBytes <= maxBytes || q === qualities[qualities.length - 1]) {
+        console.log(`[PookieMirror] Compressed photo: ${fmt} q=${q}, ~${Math.round(sizeBytes/1024)}KB`);
+        callback(dataUrl);
+        return;
+      }
+    }
+    callback(canvas.toDataURL(fmt, 0.68));
+  }
+
   /* ================================================================
-     OUTFIT SLOTS
+     OUTFIT GARMENTS (flexible list, max 3, any combo)
      ================================================================ */
-  function assignToSlot(slotKey, cartItem) {
-    // If assigning to "full", clear upper+lower
-    if (slotKey === 'full') {
-      state.outfitSlots.upper = null;
-      state.outfitSlots.lower = null;
+  function addGarment(cartItem) {
+    if (state.outfitGarments.length >= MAX_GARMENTS) {
+      alert(`Maximum ${MAX_GARMENTS} garments per try-on. Remove one first.`);
+      return;
     }
-    // If assigning to upper/lower, clear full
-    if (slotKey === 'upper' || slotKey === 'lower') {
-      state.outfitSlots.full = null;
+    // Prevent duplicate (same variant)
+    if (state.outfitGarments.some(g => g.variant_id === cartItem.variant_id)) {
+      return; // already added
     }
-    state.outfitSlots[slotKey] = cartItem;
+    state.outfitGarments.push(cartItem);
     render();
   }
 
-  function removeFromSlot(slotKey) {
-    state.outfitSlots[slotKey] = null;
+  function removeGarment(idx) {
+    state.outfitGarments.splice(idx, 1);
     render();
   }
 
-  function autoAssignToSlot(item) {
-    const cat = (item.garment_category || '').toLowerCase();
-    if (cat.includes('upper')) assignToSlot('upper', item);
-    else if (cat.includes('lower')) assignToSlot('lower', item);
-    else assignToSlot('full', item);
+  function autoAddGarment(item) {
+    addGarment(item);
   }
 
   function getAssignedItemIds() {
-    const ids = new Set();
-    Object.values(state.outfitSlots).forEach(item => {
-      if (item) ids.add(item.id);
-    });
-    return ids;
+    return new Set(state.outfitGarments.map(g => g.id));
   }
 
   function getSelectedGarments() {
-    const garments = [];
-    const slots = state.outfitSlots;
-    if (slots.full) {
-      garments.push(slots.full);
-    } else {
-      if (slots.upper) garments.push(slots.upper);
-      if (slots.lower) garments.push(slots.lower);
-    }
-    return garments;
+    return state.outfitGarments;
+  }
+
+  /** Get emoji icon for a garment category */
+  function _catIcon(cat) {
+    cat = (cat || '').toLowerCase();
+    if (cat.includes('lower') || cat.includes('bottom')) return '👖';
+    if (cat.includes('full') || cat.includes('dress')) return '👗';
+    return '👕';
+  }
+  /** Get short label for a garment category */
+  function _catLabel(cat) {
+    cat = (cat || '').toLowerCase();
+    if (cat.includes('lower') || cat.includes('bottom')) return 'Bottom';
+    if (cat.includes('full') || cat.includes('dress')) return 'Full Outfit';
+    return 'Top';
   }
 
   /* ================================================================
@@ -412,7 +468,24 @@
     render();
 
     const personDataUrl = state.photos[state.selectedPhotoIdx].dataUrl;
-    const personB64 = personDataUrl.split(',')[1];
+    // Ensure JPEG format for API (convert WebP if needed)
+    let personB64;
+    if (personDataUrl.startsWith('data:image/webp')) {
+      // Convert WebP → JPEG for backend compatibility
+      const tmpImg = new Image();
+      const jpegPromise = new Promise((resolve) => {
+        tmpImg.onload = () => {
+          const c = document.createElement('canvas');
+          c.width = tmpImg.width; c.height = tmpImg.height;
+          c.getContext('2d').drawImage(tmpImg, 0, 0);
+          resolve(c.toDataURL('image/jpeg', 0.85).split(',')[1]);
+        };
+      });
+      tmpImg.src = personDataUrl;
+      personB64 = await jpegPromise;
+    } else {
+      personB64 = personDataUrl.split(',')[1];
+    }
 
     // Bulletproof: for any garment missing product_image_3d, fetch it now
     for (const g of garments) {
@@ -658,90 +731,97 @@
 
   function renderBuilder() {
     const assignedIds = getAssignedItemIds();
-    const hasFullOutfit = !!state.outfitSlots.full;
-    const hasPartial = !!state.outfitSlots.upper || !!state.outfitSlots.lower;
     const hasPhoto = state.selectedPhotoIdx >= 0;
-    const hasGarment = getSelectedGarments().length > 0;
+    const hasGarment = state.outfitGarments.length > 0;
     const canGenerate = hasPhoto && hasGarment && state.tryonCount < MAX_TRYONS_PER_SESSION;
 
     let html = '';
 
-    // ---- Photo section ----
-    html += '<p class="pm-section-title">📸 Your Photo</p>';
-    html += '<div class="pm-photos">';
-    for (let i = 0; i < MAX_PHOTOS; i++) {
-      const photo = state.photos[i];
-      const selected = i === state.selectedPhotoIdx;
-      if (photo) {
+    // ---- Photo gallery section ----
+    html += `<p class="pm-section-title">📸 Your Photos${state.photos.length > 0 ? ' (' + state.photos.length + '/' + MAX_PHOTOS + ')' : ''}</p>`;
+
+    if (state.photos.length === 0) {
+      // Empty state — prominent upload CTA
+      html += `<div class="pm-photo-empty" onclick="document.getElementById('pm-file-input').click()">
+        <div class="pm-photo-empty__icon">📷</div>
+        <div class="pm-photo-empty__text">Upload your photo to try on outfits</div>
+        <div class="pm-photo-empty__hint">Tap to add a photo (max ${MAX_PHOTOS})</div>
+      </div>`;
+    } else {
+      // Photo gallery — show filled photos + optional add button
+      html += '<div class="pm-photos">';
+      state.photos.forEach((photo, i) => {
+        const selected = i === state.selectedPhotoIdx;
         html += `
           <div class="pm-photos__slot pm-photos__slot--filled ${selected ? 'pm-photos__slot--selected' : ''}"
                onclick="window._pm.selectPhoto(${i})">
             <img src="${photo.dataUrl}" alt="Photo ${i+1}">
+            ${selected ? '<span class="pm-photos__check">✓</span>' : ''}
             <button class="pm-photos__remove" onclick="event.stopPropagation(); window._pm.removePhoto(${i})">&times;</button>
           </div>`;
-      } else {
+      });
+      // Add button (only if under limit)
+      if (state.photos.length < MAX_PHOTOS) {
         html += `
-          <div class="pm-photos__slot" onclick="document.getElementById('pm-file-input').click()">
+          <div class="pm-photos__slot pm-photos__slot--add" onclick="document.getElementById('pm-file-input').click()">
             <span class="pm-photos__add-icon">+</span>
           </div>`;
       }
+      html += '</div>';
     }
-    html += '</div>';
 
-    // ---- Outfit slots ----
-    html += '<p class="pm-section-title">👗 Your Outfit</p>';
-    html += '<div class="pm-outfit">';
+    // ---- Outfit garments section ----
+    html += `<p class="pm-section-title">👗 Your Outfit${state.outfitGarments.length > 0 ? ' (' + state.outfitGarments.length + '/' + MAX_GARMENTS + ')' : ''}</p>`;
 
-    // Upper slot
-    const upper = state.outfitSlots.upper;
-    html += `<div class="pm-outfit__slot ${upper ? 'pm-outfit__slot--filled' : ''} ${hasFullOutfit ? 'pm-outfit__slot--disabled' : ''}">
-      <span class="pm-outfit__slot-icon">👕</span>
-      <div class="pm-outfit__slot-info">
-        <div class="pm-outfit__slot-label">Upper</div>
-        <div class="pm-outfit__slot-name">${upper ? upper.title : 'Tap an item below'}</div>
-      </div>
-      ${upper ? `<img class="pm-outfit__slot-thumb" src="${upper.image}" alt="">
-        <button class="pm-outfit__slot-remove" onclick="window._pm.removeSlot('upper')">&times;</button>` : ''}
-    </div>`;
-
-    // Lower slot
-    const lower = state.outfitSlots.lower;
-    html += `<div class="pm-outfit__slot ${lower ? 'pm-outfit__slot--filled' : ''} ${hasFullOutfit ? 'pm-outfit__slot--disabled' : ''}">
-      <span class="pm-outfit__slot-icon">👖</span>
-      <div class="pm-outfit__slot-info">
-        <div class="pm-outfit__slot-label">Bottom</div>
-        <div class="pm-outfit__slot-name">${lower ? lower.title : 'Tap an item below'}</div>
-      </div>
-      ${lower ? `<img class="pm-outfit__slot-thumb" src="${lower.image}" alt="">
-        <button class="pm-outfit__slot-remove" onclick="window._pm.removeSlot('lower')">&times;</button>` : ''}
-    </div>`;
-
-    // Full outfit slot
-    const full = state.outfitSlots.full;
-    html += `<div class="pm-outfit__slot ${full ? 'pm-outfit__slot--filled' : ''} ${hasPartial ? 'pm-outfit__slot--disabled' : ''}">
-      <span class="pm-outfit__slot-icon">👗</span>
-      <div class="pm-outfit__slot-info">
-        <div class="pm-outfit__slot-label">Full Outfit</div>
-        <div class="pm-outfit__slot-name">${full ? full.title : 'Or pick a dress / set'}</div>
-      </div>
-      ${full ? `<img class="pm-outfit__slot-thumb" src="${full.image}" alt="">
-        <button class="pm-outfit__slot-remove" onclick="window._pm.removeSlot('full')">&times;</button>` : ''}
-    </div>`;
-    html += '</div>';
-
-    // ---- Cart items tray ----
-    if (state.cartItems.length > 0) {
-      html += '<p class="pm-section-title">🛒 From Your Cart</p>';
-      html += '<div class="pm-tray">';
-      state.cartItems.forEach((item, i) => {
-        const used = assignedIds.has(item.id);
-        html += `
-          <div class="pm-tray__item ${used ? 'pm-tray__item--used' : ''}" onclick="window._pm.trayTap(${i})">
-            <img class="pm-tray__item-img" src="${item.image}" alt="${item.title}">
-            <div class="pm-tray__item-name">${item.title}</div>
-          </div>`;
+    if (state.outfitGarments.length > 0) {
+      html += '<div class="pm-outfit">';
+      state.outfitGarments.forEach((g, i) => {
+        const icon = _catIcon(g.garment_category);
+        const label = _catLabel(g.garment_category);
+        html += `<div class="pm-outfit__card">
+          <img class="pm-outfit__card-thumb" src="${g.image}" alt="">
+          <div class="pm-outfit__card-info">
+            <div class="pm-outfit__card-name">${g.title}</div>
+            <div class="pm-outfit__card-badge">${icon} ${label}</div>
+          </div>
+          <button class="pm-outfit__card-remove" onclick="window._pm.removeGarment(${i})">&times;</button>
+        </div>`;
       });
       html += '</div>';
+    }
+
+    // Combination hint
+    if (state.outfitGarments.length === 1) {
+      const cat = (state.outfitGarments[0].garment_category || '').toLowerCase();
+      if (cat.includes('lower') || cat.includes('bottom')) {
+        html += '<p class="pm-hint">💡 Tip: Add a matching top for a complete look</p>';
+      } else if (cat.includes('upper') && !cat.includes('full')) {
+        html += '<p class="pm-hint">💡 Matching bottom & accessories will be auto-styled</p>';
+      }
+    } else if (state.outfitGarments.length === MAX_GARMENTS) {
+      html += '<p class="pm-hint">✨ Full outfit ready — let\'s see your look!</p>';
+    }
+
+    // ---- Cart items tray ----
+    const availableCartItems = state.cartItems.filter(item => !assignedIds.has(item.id));
+    if (state.cartItems.length > 0) {
+      html += '<p class="pm-section-title">🛒 From Your Cart</p>';
+      if (availableCartItems.length > 0 && state.outfitGarments.length < MAX_GARMENTS) {
+        html += '<div class="pm-tray">';
+        state.cartItems.forEach((item, i) => {
+          const used = assignedIds.has(item.id);
+          html += `
+            <div class="pm-tray__item ${used ? 'pm-tray__item--used' : ''}" onclick="window._pm.trayTap(${i})">
+              <img class="pm-tray__item-img" src="${item.image}" alt="${item.title}">
+              <div class="pm-tray__item-name">${item.title}</div>
+            </div>`;
+        });
+        html += '</div>';
+      } else if (state.outfitGarments.length >= MAX_GARMENTS) {
+        html += '<p class="pm-hint">All garment slots filled (${MAX_GARMENTS}/${MAX_GARMENTS})</p>';
+      } else {
+        html += '<p class="pm-hint">All cart items added to your outfit</p>';
+      }
     } else {
       html += '<div class="pm-empty"><div class="pm-empty__icon">🛒</div>Your cart is empty.<br>Add items to try them on!</div>';
     }
@@ -845,23 +925,12 @@
   }
 
   /* ================================================================
-     TRAY TAP — Smart slot assignment
+     TRAY TAP — Add garment from cart
      ================================================================ */
   function trayTap(cartIdx) {
     const item = state.cartItems[cartIdx];
     if (!item) return;
-
-    const cat = (item.garment_category || '').toLowerCase();
-
-    // Smart assignment based on category
-    if (cat.includes('lower') || cat.includes('bottom') || cat.includes('plazo') || cat.includes('skirt')) {
-      assignToSlot('lower', item);
-    } else if (cat.includes('full') || cat.includes('dress') || cat.includes('gown') || cat.includes('kurti-set') || cat.includes('cord-set') || cat.includes('maxi') || cat.includes('single')) {
-      assignToSlot('full', item);
-    } else {
-      // Default: upper body (tops, shirts, kurtis, blouses, etc.)
-      assignToSlot('upper', item);
-    }
+    addGarment(item);
   }
 
   /* ================================================================
@@ -881,7 +950,7 @@
   window._pm = {
     selectPhoto,
     removePhoto,
-    removeSlot: removeFromSlot,
+    removeGarment,
     trayTap,
     generate: generateTryon,
     goToPanel,
