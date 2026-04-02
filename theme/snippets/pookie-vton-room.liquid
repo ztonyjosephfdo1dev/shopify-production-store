@@ -137,6 +137,39 @@
       setTimeout(() => fab.classList.remove('pm-fab--blink'), 3000);
     });
 
+    // Intercept fetch to /cart/add so we reliably fire cart:updated
+    const _origFetch = window.fetch;
+    window.fetch = function(...args) {
+      const req = args[0];
+      const url = (typeof req === 'string') ? req : (req && req.url ? req.url : '');
+      const result = _origFetch.apply(this, args);
+      if (url && (url.includes('/cart/add') || url.includes('/cart/change') || url.includes('/cart/update'))) {
+        result.then(r => {
+          if (r && r.ok) {
+            setTimeout(() => document.dispatchEvent(new CustomEvent('cart:updated')), 300);
+          }
+        }).catch(() => {});
+      }
+      return result;
+    };
+    // Also intercept XMLHttpRequest for older themes
+    const _origXhrOpen = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function(method, url, ...rest) {
+      this._pmUrl = url;
+      return _origXhrOpen.call(this, method, url, ...rest);
+    };
+    const _origXhrSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.send = function(...args) {
+      if (this._pmUrl && (this._pmUrl.includes('/cart/add') || this._pmUrl.includes('/cart/change') || this._pmUrl.includes('/cart/update'))) {
+        this.addEventListener('load', () => {
+          if (this.status >= 200 && this.status < 300) {
+            setTimeout(() => document.dispatchEvent(new CustomEvent('cart:updated')), 300);
+          }
+        });
+      }
+      return _origXhrSend.apply(this, args);
+    };
+
     // Escape key closes drawer
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && state.open) closeDrawer();
