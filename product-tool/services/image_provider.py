@@ -170,12 +170,15 @@ class OpenAIImageProvider(ImageProvider):
             detail_desc = ("CLOSE-UP of the outfit on the model — showing fabric texture, "
                            "embroidery, print/logo, embellishments, and craftsmanship "
                            "details up close on the model.")
-            threed_desc = ("3D PRODUCT SHOT — the COMPLETE OUTFIT FLOATING IN MID-AIR as if worn by a "
-                           "COMPLETELY INVISIBLE transparent mannequin (mannequin must NOT be visible AT ALL — "
-                           "no skin, no body, no form — ONLY the garment floating). "
+            threed_desc = ("PROFESSIONAL GHOST MANNEQUIN PHOTOGRAPHY (hollow-man technique) — "
+                           "the COMPLETE OUTFIT retains its natural 3D worn shape and volume, "
+                           "but the body inside has been COMPLETELY DIGITALLY REMOVED. "
+                           "The garment appears HOLLOW and EMPTY inside — you can see into the neckline/collar opening. "
+                           "There is NO body, NO skin, NO mannequin form, NO human shape — "
+                           "ONLY the empty garment shell holding its shape as if the wearer vanished. "
                            "Split into TWO HALVES inside this single panel: "
                            "LEFT HALF = FRONT VIEW, RIGHT HALF = BACK VIEW (rotated 180°). "
-                           "Both halves on clean white background. NO model, NO person, NO visible mannequin. "
+                           "Both halves on clean white background. "
                            "Full garment visible neckline to hem in BOTH halves, perfectly lit, premium e-commerce photography.")
         elif _matches(gt, _UPPER):
             hero_desc = ("HERO — WAIST-UP HALF-BODY SHOT of model wearing the garment. "
@@ -188,12 +191,15 @@ class OpenAIImageProvider(ImageProvider):
             detail_desc = ("CLOSE-UP of the TOP on the model — camera zooms into the upper body. "
                            "Show neckline, collar, sleeve detail, fabric texture, print/logo up close. "
                            "Camera focuses ONLY on the top garment piece.")
-            threed_desc = ("3D PRODUCT SHOT — ONLY the TOP garment FLOATING IN MID-AIR as if worn by a "
-                           "COMPLETELY INVISIBLE transparent mannequin (mannequin must NOT be visible AT ALL — "
-                           "no skin, no body, no form — ONLY the garment floating). "
+            threed_desc = ("PROFESSIONAL GHOST MANNEQUIN PHOTOGRAPHY (hollow-man technique) — "
+                           "ONLY the TOP garment retains its natural 3D worn shape and volume, "
+                           "but the body inside has been COMPLETELY DIGITALLY REMOVED. "
+                           "The garment appears HOLLOW and EMPTY inside — you can see into the neckline/collar opening. "
+                           "There is NO body, NO skin, NO mannequin form, NO human shape — "
+                           "ONLY the empty garment shell holding its shape as if the wearer vanished. "
                            "Split into TWO HALVES inside this single panel: "
                            "LEFT HALF = FRONT VIEW, RIGHT HALF = BACK VIEW (rotated 180°). "
-                           "Both halves on clean white background. NO model, NO person, NO bottom wear, NO visible mannequin. "
+                           "Both halves on clean white background. NO bottom wear. "
                            "Just the top piece in both halves, perfectly lit, premium e-commerce photography.")
         elif _matches(gt, _LOWER):
             hero_desc = ("HERO — WAIST-DOWN HALF-BODY SHOT of model wearing the garment. "
@@ -206,12 +212,15 @@ class OpenAIImageProvider(ImageProvider):
             detail_desc = ("CLOSE-UP of the BOTTOM on the model — camera zooms into the lower body. "
                            "Show waistband, fabric drape, pattern detail, hem, fit silhouette. "
                            "Camera focuses ONLY on the bottom garment piece.")
-            threed_desc = ("3D PRODUCT SHOT — ONLY the BOTTOM garment FLOATING IN MID-AIR as if worn by a "
-                           "COMPLETELY INVISIBLE transparent mannequin (mannequin must NOT be visible AT ALL — "
-                           "no skin, no body, no form — ONLY the garment floating). "
+            threed_desc = ("PROFESSIONAL GHOST MANNEQUIN PHOTOGRAPHY (hollow-man technique) — "
+                           "ONLY the BOTTOM garment retains its natural 3D worn shape and volume, "
+                           "but the body inside has been COMPLETELY DIGITALLY REMOVED. "
+                           "The garment appears HOLLOW and EMPTY inside — you can see into the waistband opening. "
+                           "There is NO body, NO skin, NO mannequin form, NO human shape — "
+                           "ONLY the empty garment shell holding its shape as if the wearer vanished. "
                            "Split into TWO HALVES inside this single panel: "
                            "LEFT HALF = FRONT VIEW, RIGHT HALF = BACK VIEW (rotated 180°). "
-                           "Both halves on clean white background. NO model, NO person, NO top wear, NO visible mannequin. "
+                           "Both halves on clean white background. NO top wear. "
                            "Just the bottom piece in both halves, perfectly lit, premium e-commerce photography.")
         else:
             # Unknown type → default to full-body (safest)
@@ -222,12 +231,15 @@ class OpenAIImageProvider(ImageProvider):
             detail_desc = ("CLOSE-UP of the outfit on the model — showing fabric texture, "
                            "embroidery, print/logo, embellishments, and craftsmanship "
                            "details up close on the model.")
-            threed_desc = ("3D PRODUCT SHOT — the COMPLETE OUTFIT FLOATING IN MID-AIR as if worn by a "
-                           "COMPLETELY INVISIBLE transparent mannequin (mannequin must NOT be visible AT ALL — "
-                           "no skin, no body, no form — ONLY the garment floating). "
+            threed_desc = ("PROFESSIONAL GHOST MANNEQUIN PHOTOGRAPHY (hollow-man technique) — "
+                           "the COMPLETE OUTFIT retains its natural 3D worn shape and volume, "
+                           "but the body inside has been COMPLETELY DIGITALLY REMOVED. "
+                           "The garment appears HOLLOW and EMPTY inside — you can see into the neckline/collar opening. "
+                           "There is NO body, NO skin, NO mannequin form, NO human shape — "
+                           "ONLY the empty garment shell holding its shape as if the wearer vanished. "
                            "Split into TWO HALVES inside this single panel: "
                            "LEFT HALF = FRONT VIEW, RIGHT HALF = BACK VIEW (rotated 180°). "
-                           "Both halves on clean white background. NO model, NO person, NO visible mannequin. "
+                           "Both halves on clean white background. "
                            "Full garment visible neckline to hem in BOTH halves, perfectly lit, premium e-commerce photography.")
 
         # ---- Build 6 panels ----

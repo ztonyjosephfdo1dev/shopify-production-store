@@ -130,8 +130,12 @@
       openDrawer();
     });
 
-    // Re-fetch cart when items change
-    document.addEventListener('cart:updated', fetchCart);
+    // Re-fetch cart when items change + blink FAB
+    document.addEventListener('cart:updated', () => {
+      fetchCart();
+      fab.classList.add('pm-fab--blink');
+      setTimeout(() => fab.classList.remove('pm-fab--blink'), 3000);
+    });
 
     // Escape key closes drawer
     document.addEventListener('keydown', (e) => {

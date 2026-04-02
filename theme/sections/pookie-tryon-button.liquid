@@ -43,6 +43,12 @@
     // Dispatch custom event that the Pookie Mirror snippet listens for
     document.dispatchEvent(new CustomEvent('pookie-mirror:open', { detail: productData }));
   });
+
+  // Blink try-on button for 3s when customer adds to cart
+  document.addEventListener('cart:updated', function() {
+    btn.classList.add('pm-tryon-btn--blink');
+    setTimeout(function() { btn.classList.remove('pm-tryon-btn--blink'); }, 3000);
+  });
 })();
 </script>
 {% endif %}
