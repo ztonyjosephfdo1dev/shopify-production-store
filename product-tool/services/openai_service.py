@@ -106,6 +106,11 @@ TAG RULES:
 """
 
 
+def _sanitize(s: str) -> str:
+    """Strip surrogate characters that can't be UTF-8 encoded (common from Windows copy-paste / IME)."""
+    return s.encode("utf-8", errors="ignore").decode("utf-8") if s else s
+
+
 def analyze_and_generate_text(images: list, user_name: str = "", user_description: str = "") -> dict:
     """
     Single GPT-4.1-nano call: analyzes product image(s) + generates all text.
@@ -120,16 +125,22 @@ def analyze_and_generate_text(images: list, user_name: str = "", user_descriptio
     """
     client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
+    # Sanitize user-supplied text to prevent surrogate UTF-8 encode crashes
+    user_name = _sanitize(user_name)
+    user_description = _sanitize(user_description)
+
     # Build the user message with image(s)
     content_parts = []
 
     # Add images (up to 3)
     for img in images[:3]:
+        # Ensure base64 string is clean ASCII (b64encode always produces ASCII, but sanitize anyway)
+        clean_b64 = img['base64'].encode("ascii", errors="ignore").decode("ascii")
         content_parts.append(
             {
                 "type": "image_url",
                 "image_url": {
-                    "url": f"data:{img['content_type']};base64,{img['base64']}",
+                    "url": f"data:{img['content_type']};base64,{clean_b64}",
                     "detail": "high",  # high detail needed to read text, logos, patterns on garment
                 },
             }
