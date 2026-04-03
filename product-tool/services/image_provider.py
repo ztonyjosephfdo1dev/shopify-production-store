@@ -1349,7 +1349,8 @@ PHOTOGRAPHY RULES:
         for i, brief in enumerate(garment_briefs):
             cat = garment_categories[i] if i < len(garment_categories) else "garment"
             slot = {"upper_body": "on upper body", "lower_body": "on lower body",
-                    "full_body": "as complete outfit"}.get(cat, "")
+                    "full_body": "as complete outfit",
+                    "coord_set": "as coordinated set (matching top + bottom)"}.get(cat, "")
             # Add layering context when multiple garments share a category
             if cat_counts.get(cat, 0) > 1 and cat in ("upper_body", "full_body"):
                 # First garment = base layer, subsequent = outer layer
@@ -1359,7 +1360,7 @@ PHOTOGRAPHY RULES:
                 else:
                     slot += " — outer layer, worn OVER the previous"
             # Handle full_body + upper_body combo (jacket over dress)
-            if cat == "upper_body" and "full_body" in cat_counts:
+            if cat == "upper_body" and ("full_body" in cat_counts or "coord_set" in cat_counts):
                 slot = "layered OVER the full outfit"
             outfit_parts.append(f"- {brief} ({slot})" if slot else f"- {brief}")
         outfit_desc = "\n".join(outfit_parts)
@@ -1374,6 +1375,14 @@ PHOTOGRAPHY RULES:
 - Matching footwear appropriate to the combined outfit style
 - Minimal accessories — the outfit combination is the star
 - The layered top should look naturally styled over the base outfit"""
+        elif "coord_set" in cats:
+            accessory_instructions = """COMPLETE THE LOOK with:
+- This is a COORDINATED SET — matching top + bottom sold as a pair
+- BOTH pieces (top + bottom) MUST be EQUALLY visible and prominent
+- Emphasize the COORDINATION: matching fabric, pattern continuity, color harmony
+- Matching footwear appropriate to the coord set style
+- Minimal accessories — the coordinated set IS the star
+- Show the complete head-to-toe look so both pieces are clearly visible"""
         elif "full_body" in cats:
             accessory_instructions = """COMPLETE THE LOOK with:
 - Matching footwear (heels, block heels, or ethnic juttis depending on outfit style)
@@ -1605,7 +1614,8 @@ OUTPUT: Generate a SINGLE high-quality fashion editorial photo of this person.
         for i, brief in enumerate(garment_briefs):
             cat = garment_categories[i] if i < len(garment_categories) else "garment"
             slot = {"upper_body": "on upper body", "lower_body": "on lower body",
-                    "full_body": "as complete outfit"}.get(cat, "")
+                    "full_body": "as complete outfit",
+                    "coord_set": "as coordinated set (matching top + bottom)"}.get(cat, "")
             # Layering context for multiple garments in same category
             if cat_counts.get(cat, 0) > 1 and cat in ("upper_body", "full_body"):
                 layer_items = [j for j in range(i+1) if (garment_categories[j] if j < len(garment_categories) else "") == cat]
@@ -1613,7 +1623,7 @@ OUTPUT: Generate a SINGLE high-quality fashion editorial photo of this person.
                     slot += " — base layer"
                 else:
                     slot += " — outer layer, worn OVER the previous"
-            if cat == "upper_body" and "full_body" in cat_counts:
+            if cat == "upper_body" and ("full_body" in cat_counts or "coord_set" in cat_counts):
                 slot = "layered OVER the full outfit"
             outfit_parts.append(f"- {brief} ({slot})" if slot else f"- {brief}")
         outfit_desc = "\n".join(outfit_parts)

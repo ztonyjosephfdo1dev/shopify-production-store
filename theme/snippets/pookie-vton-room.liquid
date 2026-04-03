@@ -422,6 +422,7 @@
   /** Get emoji icon for a garment category */
   function _catIcon(cat) {
     cat = (cat || '').toLowerCase();
+    if (cat.includes('coord')) return '👔';
     if (cat.includes('lower') || cat.includes('bottom')) return '👖';
     if (cat.includes('full') || cat.includes('dress')) return '👗';
     return '👕';
@@ -429,6 +430,7 @@
   /** Get short label for a garment category */
   function _catLabel(cat) {
     cat = (cat || '').toLowerCase();
+    if (cat.includes('coord')) return 'Coord Set';
     if (cat.includes('lower') || cat.includes('bottom')) return 'Bottom';
     if (cat.includes('full') || cat.includes('dress')) return 'Full Outfit';
     return 'Top';
@@ -793,7 +795,9 @@
     // Combination hint
     if (state.outfitGarments.length === 1) {
       const cat = (state.outfitGarments[0].garment_category || '').toLowerCase();
-      if (cat.includes('lower') || cat.includes('bottom')) {
+      if (cat.includes('coord')) {
+        html += '<p class="pm-hint">✨ Coord set — complete matching outfit ready!</p>';
+      } else if (cat.includes('lower') || cat.includes('bottom')) {
         html += '<p class="pm-hint">💡 Tip: Add a matching top for a complete look</p>';
       } else if (cat.includes('upper') && !cat.includes('full')) {
         html += '<p class="pm-hint">💡 Matching bottom & accessories will be auto-styled</p>';
