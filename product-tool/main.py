@@ -83,6 +83,36 @@ GARMENT_TO_COLLECTION = {
 }
 
 
+# ---- Garment type → VTON category (upper_body / lower_body / full_body) ----
+GARMENT_TYPE_TO_CATEGORY = {
+    "top": "upper_body", "tops": "upper_body", "top-wear": "upper_body",
+    "casual-top": "upper_body", "korean-top": "upper_body",
+    "kurti": "upper_body", "shirt": "upper_body", "blouse": "upper_body",
+    "crop-top": "upper_body", "crop top": "upper_body",
+    "fancy-crop-top": "upper_body", "fancy-top": "upper_body",
+    "knitting-top": "upper_body", "tan-top": "upper_body",
+    "t-shirt": "upper_body", "jacket": "upper_body",
+    "sweatshirt": "upper_body", "hoodie": "upper_body",
+    "cardigan": "upper_body", "sweater": "upper_body",
+    "bottom": "lower_body", "bottom-1": "lower_body",
+    "plazo": "lower_body", "palazzo": "lower_body",
+    "skirt": "lower_body", "jeans": "lower_body",
+    "formal-pants": "lower_body", "joggers": "lower_body",
+    "shorts": "lower_body", "leggings": "lower_body",
+    "cargo-pants": "lower_body", "trousers": "lower_body",
+    "pants": "lower_body", "capri": "lower_body",
+    "culottes": "lower_body",
+    "dress": "full_body", "gown": "full_body", "gown-1": "full_body",
+    "maxi": "full_body", "casual-maxi": "full_body",
+    "single-piece": "full_body", "bodycon": "full_body",
+    "cord-set": "full_body", "kurti-set": "full_body",
+    "kurthi-set": "full_body", "suits": "full_body",
+    "indo-western": "full_body", "jumpsuit": "full_body",
+    "saree": "full_body", "anarkali": "full_body",
+    "lehenga": "full_body", "sharara": "full_body",
+}
+
+
 def _cors_headers():
     return {"Access-Control-Allow-Origin": "*"}
 
@@ -258,6 +288,12 @@ def _handle_preview(request):
     garment_design_details = ai_result.get("garment_design_details", "")
     uploaded_image_info = ai_result.get("uploaded_images", [])
 
+    # Compute VTON category from detected garment type
+    garment_category = GARMENT_TYPE_TO_CATEGORY.get(
+        detected_garment_type.lower().strip(), "full_body"
+    )
+    print(f"[Preview] Garment category: {detected_garment_type} → {garment_category}")
+
     # ===== STEP 2: AI Image Generation — 6-pose grid =====
     print(f"[Preview] Step 2/2: Generating 6-pose grid (quality={image_quality})...")
     print(f"[Preview] Model prompt length: {len(model_prompt)} chars")
@@ -400,6 +436,9 @@ def _handle_preview(request):
                 "vton_failed": vton_failed,
                 "ai_analysis": {
                     "garment_type": detected_garment_type,
+                    "garment_category": garment_category,
+                    "garment_brief": garment_brief,
+                    "garment_design_details": garment_design_details,
                     "dress_style": dress_style,
                     "color": ai_result.get("detected_color", ""),
                     "fabric": ai_result.get("detected_fabric", ""),
@@ -667,6 +706,7 @@ def _handle_tryon_fast(request):
         garment_images=garment_images,
         garment_briefs=garment_briefs,
         garment_categories=garment_categories,
+        garment_3d_images=garment_3d_images,
         quality=quality,
     )
 

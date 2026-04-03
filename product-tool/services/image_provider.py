@@ -1070,6 +1070,7 @@ PHOTOGRAPHY RULES:
         garment_images: list[bytes],
         garment_briefs: list[str],
         garment_categories: list[str],
+        garment_3d_images: list[bytes | None] = None,
         quality: str = "medium",
     ) -> bytes | None:
         """
@@ -1110,6 +1111,16 @@ PHOTOGRAPHY RULES:
 
         person_pil = _resize(person_image, 1024)
         garment_pils = [_resize(g, 768) for g in garment_images]
+
+        # Resize 3D garment images (clean garment references) if available
+        garment_3d_pils = []
+        if garment_3d_images:
+            for g3d in garment_3d_images:
+                if g3d is not None:
+                    garment_3d_pils.append(_resize(g3d, 768))
+                else:
+                    garment_3d_pils.append(None)
+        has_3d = any(g is not None for g in garment_3d_pils)
 
         # ---- Build outfit description with slots ----
         outfit_parts = []
@@ -1216,8 +1227,27 @@ OUTPUT: Generate a SINGLE high-quality fashion editorial photo of this person.
 
         # ---- Contents: person photo FIRST (image to edit), then garments, then prompt ----
         contents = [person_pil]
-        for g_pil in garment_pils:
-            contents.append(g_pil)
+        for i, g_pil in enumerate(garment_pils):
+            brief = garment_briefs[i] if i < len(garment_briefs) else "Fashion garment"
+            cat = garment_categories[i] if i < len(garment_categories) else "garment"
+
+            if has_3d and i < len(garment_3d_pils) and garment_3d_pils[i] is not None:
+                # Use clean garment reference (no AI model face)
+                contents.append(f"[GARMENT {i+1} — REAL GARMENT PHOTO: {brief} — Actual garment with NO model. Wear this {cat.replace('_', ' ')}]")
+                contents.append(garment_3d_pils[i])
+                _log(f"Garment {i+1}: using CLEAN garment photo (3D) — face swap prevention")
+            else:
+                # Crop top 25% of hero to reduce face contamination
+                try:
+                    w, h = g_pil.size
+                    crop_top = int(h * 0.25)
+                    cropped = g_pil.crop((0, crop_top, w, h))
+                    contents.append(f"[GARMENT {i+1} — PRODUCT PHOTO (cropped): {brief} — IGNORE any person, study ONLY the garment. Wear this {cat.replace('_', ' ')}]")
+                    contents.append(cropped)
+                    _log(f"Garment {i+1}: using CROPPED product photo (top 25% removed)")
+                except Exception:
+                    contents.append(g_pil)
+                    _log(f"Garment {i+1}: using full product photo (crop failed)")
         contents.append(prompt)
 
         # ---- Try each model ----

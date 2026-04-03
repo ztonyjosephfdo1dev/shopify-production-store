@@ -743,6 +743,9 @@
       compare_at_price: previewData.compare_at_price,
       collections: previewData.collections,
       images: previewData.images,
+      garment_brief: (previewData.ai_analysis && previewData.ai_analysis.garment_brief) || '',
+      garment_category: (previewData.ai_analysis && previewData.ai_analysis.garment_category) || '',
+      garment_design_details: (previewData.ai_analysis && previewData.ai_analysis.garment_design_details) || '',
     };
 
     fetch(BACKEND_URL + '?action=confirm', {
@@ -861,7 +864,10 @@
           price: prevData.preview.price,
           compare_at_price: prevData.preview.compare_at_price,
           collections: prevData.preview.collections,
-          images: prevData.preview.images
+          images: prevData.preview.images,
+          garment_brief: (prevData.preview.ai_analysis && prevData.preview.ai_analysis.garment_brief) || '',
+          garment_category: (prevData.preview.ai_analysis && prevData.preview.ai_analysis.garment_category) || '',
+          garment_design_details: (prevData.preview.ai_analysis && prevData.preview.ai_analysis.garment_design_details) || '',
         };
 
         var confRes = await fetch(BACKEND_URL + '?action=confirm', {
