@@ -39,7 +39,7 @@ RESPOND ONLY WITH VALID JSON matching this exact schema:
   "seo_description": "Meta description under 160 chars with a call-to-action",
   "detected_color": "Primary color name",
   "detected_fabric": "Fabric type (cotton, silk, georgette, crepe, rayon, polyester, etc.)",
-  "detected_garment_type": "Type (kurti, crop-top, top, dress, gown, cord-set, palazzo, skirt, etc.)",
+  "detected_garment_type": "Type (kurti, crop-top, top, dress, gown, cord-set, palazzo, skirt, jeans, pants, trousers, joggers, shorts, leggings, etc.)",
   "detected_style": "Style (casual, ethnic, western, indo-western, party, office, streetwear, etc.)",
   "detected_occasion": "Occasion (daily-wear, party, wedding, festival, office, date-night, brunch, etc.)",
   "dress_style": "EXACTLY one of: traditional | western | fusion | formal",
@@ -84,13 +84,21 @@ TARGET PERSONA GUIDE:
 
 MODEL_PROMPT RULES — ACT AS A FASHION STYLIST:
 - MUST describe the EXACT garment from the photo — match color, sleeve type, length, pattern precisely.
-- BOTTOM WEAR — CRITICAL: You are a fashion expert. Pick the BEST matching bottom based on the garment's color, style, fabric, and occasion. NEVER default to blue jeans. Think like a Myntra/Zara stylist:
-  • EXCEPTION: If the garment IS a full outfit (dress, gown, jumpsuit, saree, lehenga, cord-set, romper, kurti set, maxi, midi, sharara, gharara, anarkali, dungaree, overalls, salwar suit, churidar set, pant suit), do NOT add separate bottom wear — the garment already covers the full body. Only add shoes and accessories.
-  • Crop tops / casual tees → pick from: cargo pants, paperbag-waist trousers, wide-leg pants, pleated skirts, mini skirts, denim shorts, culottes, straight-leg khakis, joggers
-  • Ethnic / fusion tops → pick from: palazzos, dhoti pants, flared skirts, churidars, straight pants in contrasting color
-  • Formal / office tops → pick from: tailored trousers, pencil skirts, high-waisted cigarette pants, A-line midi skirts
-  • Party / glam tops → pick from: leather pants, sequin mini skirt, satin midi skirt, bodycon skirt, high-waisted slit trousers
-  • ALWAYS specify the exact COLOR of the bottom that complements the top (e.g., 'olive cargo pants', 'beige wide-leg trousers', 'black pleated midi skirt'). NEVER say just 'jeans' or 'blue jeans'.  \u2022 VARY the bottom color \u2014 do NOT always default to beige, khaki, cream, sand, or neutral tones. Match the garment's COLOR and ENERGY: bold tops deserve bold/dark/contrasting bottoms (black, navy, burgundy, emerald, white). Only use neutrals when the garment itself is bold enough to need toning down.- MUST include shoes (match the vibe), bag, and 1-2 accessories.
+- FIRST: Determine if the product is TOP WEAR, BOTTOM WEAR, or a FULL OUTFIT.
+  • If the product is BOTTOM WEAR (jeans, pants, trousers, palazzo, skirt, shorts, joggers, leggings, culottes, dhoti-pants, capri): Pick matching TOP wear. Think like a Myntra/Zara stylist:
+    - Casual bottoms (jeans, joggers, cargo pants) → pick from: crop tops, graphic tees, basic tees, tank tops, oversized shirts, hoodies, sweatshirts
+    - Ethnic bottoms (palazzos, dhoti-pants, sharara) → pick from: short kurtis, peplum tops, embroidered blouses, crop tops with ethnic print
+    - Formal bottoms (trousers, pencil skirts) → pick from: blazers, formal shirts, structured tops, silk blouses, turtlenecks
+    - ALWAYS specify the exact COLOR of the top that complements the bottom. NEVER default to white tops.
+  • If the product is TOP WEAR (top, shirt, kurti, blouse, crop-top, etc.): Pick matching BOTTOM wear. NEVER default to blue jeans:
+    - Crop tops / casual tees → pick from: cargo pants, paperbag-waist trousers, wide-leg pants, pleated skirts, mini skirts, denim shorts, culottes, straight-leg khakis, joggers
+    - Ethnic / fusion tops → pick from: palazzos, dhoti pants, flared skirts, churidars, straight pants in contrasting color
+    - Formal / office tops → pick from: tailored trousers, pencil skirts, high-waisted cigarette pants, A-line midi skirts
+    - Party / glam tops → pick from: leather pants, sequin mini skirt, satin midi skirt, bodycon skirt, high-waisted slit trousers
+    - ALWAYS specify the exact COLOR of the bottom that complements the top (e.g., 'olive cargo pants', 'beige wide-leg trousers', 'black pleated midi skirt'). NEVER say just 'jeans' or 'blue jeans'.
+  • EXCEPTION: If the garment IS a full outfit (dress, gown, jumpsuit, saree, lehenga, cord-set, romper, kurti set, maxi, midi, sharara, gharara, anarkali, dungaree, overalls, salwar suit, churidar set, pant suit), do NOT add separate top or bottom wear — the garment already covers the full body. Only add shoes and accessories.
+  • VARY the pairing color — do NOT always default to beige, khaki, cream, sand, or neutral tones. Match the garment's COLOR and ENERGY: bold pieces deserve bold/dark/contrasting pairings (black, navy, burgundy, emerald, white). Only use neutrals when the garment itself is bold enough to need toning down.
+- MUST include shoes (match the vibe), bag, and 1-2 accessories.
 - MUST specify background/setting that matches the persona.
 - MUST say "editorial fashion photography" and mention lighting.
 
@@ -107,8 +115,25 @@ TAG RULES:
 
 
 def _sanitize(s: str) -> str:
-    """Strip surrogate characters that can't be UTF-8 encoded (common from Windows copy-paste / IME)."""
-    return s.encode("utf-8", errors="ignore").decode("utf-8") if s else s
+    """Strip surrogate characters that can't be UTF-8 encoded."""
+    if not s:
+        return s
+    return s.encode("utf-8", errors="ignore").decode("utf-8")
+
+
+def _sanitize_deep(obj):
+    """Recursively sanitize all strings in a nested data structure (dicts, lists, strings)."""
+    if isinstance(obj, str):
+        return _sanitize(obj)
+    if isinstance(obj, dict):
+        return {_sanitize_deep(k): _sanitize_deep(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize_deep(item) for item in obj]
+    return obj
+
+
+# Pre-sanitize the system prompt at module load time
+_CLEAN_SYSTEM_PROMPT = _sanitize(SYSTEM_PROMPT)
 
 
 def analyze_and_generate_text(images: list, user_name: str = "", user_description: str = "") -> dict:
@@ -125,7 +150,7 @@ def analyze_and_generate_text(images: list, user_name: str = "", user_descriptio
     """
     client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
-    # Sanitize user-supplied text to prevent surrogate UTF-8 encode crashes
+    # Sanitize ALL user-supplied text
     user_name = _sanitize(user_name)
     user_description = _sanitize(user_description)
 
@@ -134,14 +159,15 @@ def analyze_and_generate_text(images: list, user_name: str = "", user_descriptio
 
     # Add images (up to 3)
     for img in images[:3]:
-        # Ensure base64 string is clean ASCII (b64encode always produces ASCII, but sanitize anyway)
+        # Ensure base64 string is clean ASCII
         clean_b64 = img['base64'].encode("ascii", errors="ignore").decode("ascii")
+        clean_ct = _sanitize(img.get('content_type', 'image/jpeg')) or 'image/jpeg'
         content_parts.append(
             {
                 "type": "image_url",
                 "image_url": {
-                    "url": f"data:{img['content_type']};base64,{clean_b64}",
-                    "detail": "high",  # high detail needed to read text, logos, patterns on garment
+                    "url": f"data:{clean_ct};base64,{clean_b64}",
+                    "detail": "high",
                 },
             }
         )
@@ -155,6 +181,12 @@ def analyze_and_generate_text(images: list, user_name: str = "", user_descriptio
 
     content_parts.append({"type": "text", "text": user_text})
 
+    # Build messages and deep-sanitize EVERYTHING to prevent surrogate crashes
+    messages = _sanitize_deep([
+        {"role": "system", "content": _CLEAN_SYSTEM_PROMPT},
+        {"role": "user", "content": content_parts},
+    ])
+
     try:
         # Try multiple models in order of preference
         models_to_try = ["gpt-4o-mini", "gpt-4.1-nano", "gpt-3.5-turbo"]
@@ -165,10 +197,7 @@ def analyze_and_generate_text(images: list, user_name: str = "", user_descriptio
             try:
                 response = client.chat.completions.create(
                     model=model_name,
-                    messages=[
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": content_parts},
-                    ],
+                    messages=messages,
                     response_format={"type": "json_object"},
                     max_tokens=2000,
                     temperature=0.7,
@@ -177,7 +206,9 @@ def analyze_and_generate_text(images: list, user_name: str = "", user_descriptio
                 break
             except Exception as model_err:
                 last_error = model_err
+                import traceback
                 print(f"[OpenAI] {model_name} failed: {model_err}")
+                traceback.print_exc()
                 continue
 
         if response is None:
@@ -217,7 +248,7 @@ def analyze_and_generate_text(images: list, user_name: str = "", user_descriptio
         # SMART FALLBACK: Generate a decent template-based listing
         # when all OpenAI models fail (e.g., quota exhausted).
         # ------------------------------------------------------------------
-        name = user_name or "Trendy Fashion Top"
+        name = user_name or "Stylish Fashion Piece"
 
         # Build a template description (better than echoing user text)
         desc_parts = []
@@ -272,5 +303,5 @@ def analyze_and_generate_text(images: list, user_name: str = "", user_descriptio
             "detected_style": "casual",
             "detected_occasion": "daily-wear",
             "dress_style": "western",
-            "suggested_collections": ["tops", "top-wear"],
+            "suggested_collections": [],
         }

@@ -51,10 +51,17 @@ GARMENT_TO_COLLECTION = {
     "crop top": ["fancy-crop-top", "tops"], "crop-top": ["fancy-crop-top", "tops"],
     "top": ["tops", "top-wear"], "t-shirt": ["tops", "casual-top"],
     "kurti": ["kurti"], "dress": ["single-piece"], "gown": ["gown"],
-    "maxi": ["maxi"], "palazzo": ["plazo"], "skirt": ["skirt"],
+    "maxi": ["maxi"], "palazzo": ["plazo", "bottom"], "skirt": ["skirt", "bottom"],
     "blouse": ["blouse", "tops"], "shirt": ["shirt", "tops"],
     "bodycon": ["bodycon"], "cord-set": ["cord-set"],
     "korean top": ["korean-top", "tops"], "polo": ["tops", "top-wear"],
+    "jeans": ["bottom", "bottom-1"], "pants": ["bottom", "bottom-1"],
+    "trousers": ["bottom", "bottom-1"], "joggers": ["bottom", "bottom-1"],
+    "shorts": ["bottom", "bottom-1"], "leggings": ["bottom", "bottom-1"],
+    "culottes": ["bottom", "bottom-1"], "capri": ["bottom", "bottom-1"],
+    "plazo": ["plazo", "bottom"], "dhoti-pants": ["bottom", "bottom-1"],
+    "baggy jeans": ["bottom", "bottom-1"], "wide-leg pants": ["bottom", "bottom-1"],
+    "cargo pants": ["bottom", "bottom-1"],
 }
 
 
@@ -89,8 +96,13 @@ def _resolve_collections(category: str, suggested: list, garment_type: str) -> l
         return suggested[:3]
     if garment_type:
         gt = garment_type.lower().strip()
-        return GARMENT_TO_COLLECTION.get(gt, ["tops", "top-wear"])
-    return ["tops", "top-wear"]
+        # Check exact match first, then substring match
+        if gt in GARMENT_TO_COLLECTION:
+            return GARMENT_TO_COLLECTION[gt]
+        for key, colls in GARMENT_TO_COLLECTION.items():
+            if key in gt or gt in key:
+                return colls
+    return []
 
 
 @functions_framework.http
@@ -554,8 +566,8 @@ def _parse_tryon_request(request):
         raise ValueError("Customer photo is required.")
     if not garments:
         raise ValueError("At least one garment is required.")
-    if len(garments) > 2:
-        raise ValueError("Maximum 2 garments (top + bottom or full outfit).")
+    if len(garments) > 3:
+        raise ValueError("Maximum 3 garments per try-on.")
 
     # Decode customer photo
     try:
