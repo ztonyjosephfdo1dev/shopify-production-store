@@ -28,6 +28,315 @@ def _log(msg: str):
 
 
 # ---------------------------------------------------------------------------
+# Garment classification & per-type prompt configs (v2 — config-driven)
+# ---------------------------------------------------------------------------
+# To add a new garment type:
+#   1. Add keyword set (_NEW_KEYWORDS)
+#   2. Add entry to _CLASSIFICATION_ORDER (earlier = higher priority)
+#   3. Add entry to _GARMENT_CONFIGS with all panel descriptions
+# No other code changes needed.
+# ---------------------------------------------------------------------------
+
+_COORD_KEYWORDS = {
+    "cord-set", "co-ord", "co-ord set", "coord-set", "coord set",
+    "kurti set", "kurti-set", "kurta set", "kurta-set",
+    "plazo set", "palazzo set", "salwar-suit", "salwar suit",
+    "churidar set", "pant suit", "pantsuit", "sharara", "gharara",
+}
+_FOOTWEAR_KEYWORDS = {
+    "shoes", "heels", "sandals", "stilettos", "wedges", "flats", "boots",
+    "sneakers", "loafers", "mules", "slides", "flip-flops", "slippers",
+    "juttis", "mojaris", "kolhapuris", "platforms", "pumps", "kitten-heels",
+    "block-heels", "ankle-boots", "casual-slipper", "slipper",
+}
+_FULL_KEYWORDS = {
+    "dress", "gown", "saree", "sari", "lehenga", "lehnga", "anarkali",
+    "jumpsuit", "romper", "kaftan", "maxi", "midi", "bodycon",
+    "dungaree", "overalls", "one-piece", "single-piece",
+}
+_UPPER_KEYWORDS = {
+    "top", "crop-top", "blouse", "shirt", "kurti", "tunic", "hoodie",
+    "sweater", "jacket", "blazer", "tee", "t-shirt", "polo", "tank-top",
+    "camisole", "cardigan", "shrug", "vest", "corset", "bustier", "cape",
+    "kurta",
+}
+_LOWER_KEYWORDS = {
+    "palazzo", "skirt", "pants", "trousers", "jeans", "leggings",
+    "shorts", "culottes", "dhoti-pants", "joggers", "capri", "plazo",
+}
+
+# Checked in order — most specific first (coord_set before full,
+# footwear before everything else since it's unique)
+_CLASSIFICATION_ORDER = [
+    ("coord_set", _COORD_KEYWORDS),
+    ("footwear",  _FOOTWEAR_KEYWORDS),
+    ("full",      _FULL_KEYWORDS),
+    ("upper",     _UPPER_KEYWORDS),
+    ("lower",     _LOWER_KEYWORDS),
+]
+
+
+def _classify_garment(garment_type: str) -> str:
+    """Classify a garment type string into a category.
+
+    Returns one of: "upper", "lower", "full", "coord_set", "footwear".
+    Default: "full" (safest — shows everything).
+    """
+    gt = garment_type.lower().strip() if garment_type else ""
+    if not gt:
+        return "full"
+    for category, keywords in _CLASSIFICATION_ORDER:
+        if gt in keywords:
+            return category
+        if any(kw in gt for kw in keywords):
+            return category
+    return "full"
+
+
+# --- Ghost mannequin base template (reused across types) ---
+_3D_BASE = (
+    "PROFESSIONAL GHOST MANNEQUIN PHOTOGRAPHY (hollow-man technique) — "
+    "{scope} retains its natural 3D worn shape and volume, "
+    "but the body inside has been COMPLETELY DIGITALLY REMOVED. "
+    "The garment appears HOLLOW and EMPTY inside — you can see into the {opening}. "
+    "There is NO body, NO skin, NO mannequin form, NO human shape — "
+    "ONLY the empty garment shell holding its shape as if the wearer vanished. "
+    "Split into TWO HALVES inside this single panel: "
+    "LEFT HALF = FRONT VIEW, RIGHT HALF = BACK VIEW (rotated 180°). "
+    "Both halves on clean white background. {extra}"
+    "Perfectly lit, premium e-commerce photography."
+)
+
+_GARMENT_CONFIGS = {
+    # ------------------------------------------------------------------
+    # UPPER — top, crop-top, blouse, shirt, kurti, hoodie, jacket, etc.
+    # ------------------------------------------------------------------
+    "upper": {
+        "product_focus": (
+            "📷 PRODUCT FOCUS: The product being sold is the TOP garment. "
+            "In ALL model panels the TOP must be the visual star — filling 70-80% of the visible frame. "
+            "Complementary bottom-wear is ONLY styling context, NOT the product. "
+            "Keep it minimal, muted, and non-distracting — NEVER let pants/skirt take more visual space than the top."
+        ),
+        "hero": (
+            "HERO — WAIST-UP HALF-BODY SHOT of model wearing the garment. "
+            "Camera frames from HEAD TO WAIST ONLY — crop the image at the waist/hip line. "
+            "DO NOT show legs, knees, or feet. The bottom edge of the frame is at the waist. "
+            "The TOP garment fills 70-80% of the visible area. "
+            "Show neckline, sleeves, print, and fit prominently. "
+            "Front-facing, confident pose, soft studio lighting."
+        ),
+        "back": (
+            "WAIST-UP BACK VIEW — show back neckline, back print/pattern, closure, "
+            "and back design of the TOP. Camera frames HEAD TO WAIST only. "
+            "DO NOT show legs, knees, or feet."
+        ),
+        "angle": (
+            "WAIST-UP 3/4 ANGLE from the right — show sleeve drape, silhouette, "
+            "and side fit of the TOP. HEAD TO WAIST framing only."
+        ),
+        "detail": (
+            "CLOSE-UP of the TOP on the model — camera zooms into the upper body. "
+            "Show neckline, collar, sleeve detail, fabric texture, print/logo up close. "
+            "Camera focuses ONLY on the top garment piece."
+        ),
+        "movement": (
+            "WAIST-UP movement/gesture pose — show sleeve flow, fabric drape, "
+            "and upper-body motion. TOP fills 70-80% of the frame. "
+            "Camera frames HEAD TO WAIST."
+        ),
+        "threed": _3D_BASE.format(
+            scope="ONLY the TOP garment",
+            opening="neckline/collar opening",
+            extra="NO bottom wear. Just the top piece in both halves. ",
+        ),
+        "photography_note": (
+            "Frame the model HEAD TO WAIST in every model panel. "
+            "The waist/hip line is the bottom edge of every shot. "
+            "The TOP garment must occupy 70-80% of the visible frame area."
+        ),
+    },
+    # ------------------------------------------------------------------
+    # LOWER — pants, skirt, palazzo, jeans, leggings, shorts, etc.
+    # ------------------------------------------------------------------
+    "lower": {
+        "product_focus": (
+            "📷 PRODUCT FOCUS: The product being sold is the BOTTOM garment. "
+            "In ALL model panels the BOTTOM must be the visual star — filling 70-80% of the visible frame. "
+            "Complementary top-wear is ONLY styling context, NOT the product. "
+            "Keep it minimal, muted, and non-distracting — NEVER let the top take more visual space than the bottom."
+        ),
+        "hero": (
+            "HERO — WAIST-DOWN HALF-BODY SHOT of model wearing the garment. "
+            "Camera frames from HIP TO TOE ONLY — crop the image at the hip/waist line. "
+            "DO NOT prominently show face or upper body. The top edge of the frame is at the hip. "
+            "The BOTTOM garment fills 70-80% of the visible area. "
+            "Show waistband, drape, pattern, and silhouette prominently. "
+            "Confident standing pose, soft studio lighting."
+        ),
+        "back": (
+            "WAIST-DOWN BACK VIEW — show back pockets, seam, drape, "
+            "and back fit of the BOTTOM. HIP TO TOE framing. "
+            "DO NOT prominently show face or upper body."
+        ),
+        "angle": (
+            "WAIST-DOWN 3/4 ANGLE — show leg silhouette, side seam, "
+            "and drape of the BOTTOM. HIP TO TOE framing."
+        ),
+        "detail": (
+            "CLOSE-UP of the BOTTOM on the model — camera zooms into the lower body. "
+            "Show waistband, fabric drape, pattern detail, hem, fit silhouette. "
+            "Camera focuses ONLY on the bottom garment piece."
+        ),
+        "movement": (
+            "WAIST-DOWN walking/movement pose — show leg flow, fabric drape, "
+            "and silhouette in motion. BOTTOM fills 70-80% of the frame. "
+            "Camera frames HIP TO TOE."
+        ),
+        "threed": _3D_BASE.format(
+            scope="ONLY the BOTTOM garment",
+            opening="waistband opening",
+            extra="NO top wear. Just the bottom piece in both halves. ",
+        ),
+        "photography_note": (
+            "Frame the model HIP TO TOE in every model panel. "
+            "The hip/waist line is the top edge of every shot. "
+            "The BOTTOM garment must occupy 70-80% of the visible frame area."
+        ),
+    },
+    # ------------------------------------------------------------------
+    # FULL — dress, gown, saree, lehenga, jumpsuit, romper, kaftan, etc.
+    # ------------------------------------------------------------------
+    "full": {
+        "product_focus": (
+            "📷 PRODUCT FOCUS: The product is a COMPLETE OUTFIT covering the full body. "
+            "Show the entire garment head to toe in every model panel. "
+            "The outfit IS the star — no complementary pieces needed."
+        ),
+        "hero": (
+            "HERO — Model wearing the garment, full body HEAD TO TOE. "
+            "The complete outfit fills the frame. "
+            "Front-facing, confident pose, showing the full garment clearly. "
+            "Soft studio lighting, clean background."
+        ),
+        "back": (
+            "Full-body BACK VIEW — show back design, back print/pattern, "
+            "train, pallu, or drape of the complete outfit. HEAD TO TOE framing."
+        ),
+        "angle": (
+            "Full-body 3/4 ANGLE from the right — show silhouette, "
+            "sleeve detail, and garment drape of the complete outfit."
+        ),
+        "detail": (
+            "CLOSE-UP of the outfit on the model — showing fabric texture, "
+            "embroidery, print/logo, embellishments, and craftsmanship "
+            "details up close on the model."
+        ),
+        "movement": (
+            "Full-body walking or movement pose — showing garment flow, "
+            "drape, and silhouette in motion. HEAD TO TOE framing."
+        ),
+        "threed": _3D_BASE.format(
+            scope="the COMPLETE OUTFIT",
+            opening="neckline/collar opening",
+            extra="Full garment visible neckline to hem in BOTH halves. ",
+        ),
+        "photography_note": (
+            "Frame the model HEAD TO TOE in every model panel. "
+            "The complete outfit must be fully visible in every shot."
+        ),
+    },
+    # ------------------------------------------------------------------
+    # COORD_SET — matching top + bottom sold as a pair
+    # ------------------------------------------------------------------
+    "coord_set": {
+        "product_focus": (
+            "📷 PRODUCT FOCUS: The product is a COORDINATED SET — matching top + bottom sold as a pair. "
+            "BOTH pieces must be EQUALLY prominent in every panel. "
+            "Emphasize the COORDINATION — matching fabric, pattern continuity, "
+            "color harmony between the two pieces. Neither piece should dominate the other."
+        ),
+        "hero": (
+            "HERO — Full body HEAD TO TOE. Show BOTH pieces of the coord set equally. "
+            "The matching/coordination between top and bottom must be immediately obvious. "
+            "Front-facing, confident pose, soft studio lighting."
+        ),
+        "back": (
+            "Full-body BACK VIEW — show back design of BOTH pieces. "
+            "Back neckline of the top AND back pattern/design of the bottom. "
+            "Both pieces equally visible. HEAD TO TOE framing."
+        ),
+        "angle": (
+            "Full-body 3/4 ANGLE — show how BOTH pieces drape and flow together. "
+            "Silhouette showing the coordination between top and bottom."
+        ),
+        "detail": (
+            "SPLIT-FOCUS CLOSE-UP — show the COORDINATION between top and bottom. "
+            "Matching fabric texture, pattern alignment at the waist where pieces meet, "
+            "complementary design elements of BOTH pieces."
+        ),
+        "movement": (
+            "Full-body walking pose — show how BOTH pieces of the coord set move together. "
+            "Fabric flow of both top and bottom equally visible. HEAD TO TOE."
+        ),
+        "threed": _3D_BASE.format(
+            scope="the COMPLETE COORD SET (both pieces)",
+            opening="neckline/collar opening",
+            extra="Show BOTH pieces — top and bottom — as a complete set in both halves. ",
+        ),
+        "photography_note": (
+            "Frame the model HEAD TO TOE in every model panel. "
+            "BOTH pieces of the coord set must be equally prominent. "
+            "Visual emphasis on the MATCHING between top and bottom pieces."
+        ),
+    },
+    # ------------------------------------------------------------------
+    # FOOTWEAR — shoes, heels, sandals, boots, sneakers, etc.
+    # ------------------------------------------------------------------
+    "footwear": {
+        "product_focus": (
+            "📷 PRODUCT FOCUS: The product is FOOTWEAR. "
+            "The shoes must be the absolute visual star, filling 60-70% of every panel. "
+            "Model's outfit is purely styling context — keep it simple and non-distracting."
+        ),
+        "hero": (
+            "HERO — LOW-ANGLE shot focused on FEET. Camera at ground level, angled up slightly. "
+            "Model standing in the shoes, shoes fill 60-70% of the frame. "
+            "Full shoe design, color, material clearly visible from front/side angle. "
+            "Clean floor, soft studio lighting."
+        ),
+        "back": (
+            "LOW-ANGLE BACK VIEW of the shoes — heel design, back strap/counter, sole edge. "
+            "Camera at foot level, focused on the back of the footwear."
+        ),
+        "angle": (
+            "LOW-ANGLE 3/4 SIDE VIEW — shoe silhouette, arch, heel height, "
+            "strap/buckle design clearly visible. Camera at foot level."
+        ),
+        "detail": (
+            "EXTREME CLOSE-UP of the footwear — material texture, stitching, sole tread, "
+            "buckle, embellishment, logo, insole detail. Studio macro photography."
+        ),
+        "movement": (
+            "LOW-ANGLE walking shot — camera at ground level, shoe in mid-stride. "
+            "Sole flex and shoe silhouette visible. Shoes fill 60-70% of the frame."
+        ),
+        "threed": (
+            "SHOES ONLY on clean white background — NO model, NO person. "
+            "LEFT HALF = pair of shoes from front/top-down angle showing both shoes together. "
+            "RIGHT HALF = single shoe from side profile showing sole, heel, and silhouette. "
+            "Premium e-commerce product photography, perfectly lit."
+        ),
+        "photography_note": (
+            "Camera at FOOT/GROUND LEVEL (low angle) in every model panel. "
+            "Footwear fills 60-70% of visible frame. "
+            "Model from ankles up is background styling context only."
+        ),
+    },
+}
+
+
+# ---------------------------------------------------------------------------
 # Abstract base
 # ---------------------------------------------------------------------------
 
@@ -123,133 +432,24 @@ class OpenAIImageProvider(ImageProvider):
     @staticmethod
     def _build_dynamic_panels(uploaded_image_info: list[dict], garment_type: str = "") -> list[str]:
         """
-        Build 6 panel descriptions dynamically based on garment type + uploads.
+        Build 6 panel descriptions from _GARMENT_CONFIGS (config-driven).
 
-        LAYOUT (v3 — garment-focused):
-          Panel 1: Hero — camera framing adapts to garment type
-          Panel 2: Model back view
-          Panel 3: Model 3/4 angle
-          Panel 4: Close-up of product piece ON the model
-          Panel 5: Walking / movement pose
-          Panel 6: 3D garment FRONT + BACK floating (invisible mannequin — LOCKED, no model)
+        Uses _classify_garment() to pick the right config, then builds
+        panels from the config's hero/back/angle/detail/movement/threed keys.
+        Uploaded-image references override matching panel slots.
         """
-        gt = garment_type.lower().strip() if garment_type else ""
+        category = _classify_garment(garment_type)
+        cfg = _GARMENT_CONFIGS.get(category, _GARMENT_CONFIGS["full"])
+        _log(f"Panel config: '{garment_type}' → {category}")
 
-        # ---- Garment-type classification sets ----
-        # IMPORTANT: _FULL is checked FIRST so compound types like
-        # "shirt dress", "cape dress", "blazer set" are correctly
-        # classified as full-outfit instead of upper/lower.
-        _FULL = {"dress", "gown", "saree", "sari", "lehenga", "lehnga",
-                 "anarkali", "jumpsuit", "romper", "cord-set", "co-ord",
-                 "co-ord set", "coord-set", "salwar-suit", "salwar suit",
-                 "sharara", "gharara", "kaftan", "maxi", "midi", "bodycon",
-                 "dungaree", "overalls", "one-piece", "single-piece",
-                 "kurti set", "kurti-set", "kurta set", "kurta-set",
-                 "churidar", "churidar set", "pant suit", "pantsuit",
-                 "coord set", "plazo set", "palazzo set"}
-        _UPPER = {"top", "crop-top", "blouse", "shirt", "kurti", "tunic", "hoodie",
-                  "sweater", "jacket", "blazer", "tee", "t-shirt", "polo", "tank-top",
-                  "camisole", "cardigan", "shrug", "vest", "corset", "bustier", "cape",
-                  "kurta"}
-        _LOWER = {"palazzo", "skirt", "pants", "trousers", "jeans", "leggings",
-                  "shorts", "culottes", "dhoti-pants", "joggers", "capri", "plazo"}
-
-        def _matches(gt_str: str, keyword_set: set) -> bool:
-            """Check if garment type matches any keyword — exact match or substring."""
-            if gt_str in keyword_set:
-                return True
-            return any(kw in gt_str for kw in keyword_set)
-
-        # ---- Panel 1 (Hero): framing depends on garment type ----
-        # Check FULL first → then UPPER → then LOWER → else default to FULL
-        if _matches(gt, _FULL):
-            hero_desc = ("HERO — Model wearing the garment, full body HEAD TO TOE. "
-                         "The complete outfit fills the frame. "
-                         "Front-facing, confident pose, showing the full garment clearly. "
-                         "Soft studio lighting, clean background.")
-            detail_desc = ("CLOSE-UP of the outfit on the model — showing fabric texture, "
-                           "embroidery, print/logo, embellishments, and craftsmanship "
-                           "details up close on the model.")
-            threed_desc = ("PROFESSIONAL GHOST MANNEQUIN PHOTOGRAPHY (hollow-man technique) — "
-                           "the COMPLETE OUTFIT retains its natural 3D worn shape and volume, "
-                           "but the body inside has been COMPLETELY DIGITALLY REMOVED. "
-                           "The garment appears HOLLOW and EMPTY inside — you can see into the neckline/collar opening. "
-                           "There is NO body, NO skin, NO mannequin form, NO human shape — "
-                           "ONLY the empty garment shell holding its shape as if the wearer vanished. "
-                           "Split into TWO HALVES inside this single panel: "
-                           "LEFT HALF = FRONT VIEW, RIGHT HALF = BACK VIEW (rotated 180°). "
-                           "Both halves on clean white background. "
-                           "Full garment visible neckline to hem in BOTH halves, perfectly lit, premium e-commerce photography.")
-        elif _matches(gt, _UPPER):
-            hero_desc = ("HERO — WAIST-UP HALF-BODY SHOT of model wearing the garment. "
-                         "Camera frames from HEAD TO WAIST ONLY — crop the image at the waist/hip line. "
-                         "DO NOT show legs, knees, or feet. The bottom edge of the frame is at the waist. "
-                         "The TOP garment fills 70-80% of the visible area. "
-                         "Show neckline, sleeves, print, and fit prominently. "
-                         "This is a CLOSE-UP HALF-BODY portrait, NOT a full-body shot. "
-                         "Front-facing, confident pose, soft studio lighting.")
-            detail_desc = ("CLOSE-UP of the TOP on the model — camera zooms into the upper body. "
-                           "Show neckline, collar, sleeve detail, fabric texture, print/logo up close. "
-                           "Camera focuses ONLY on the top garment piece.")
-            threed_desc = ("PROFESSIONAL GHOST MANNEQUIN PHOTOGRAPHY (hollow-man technique) — "
-                           "ONLY the TOP garment retains its natural 3D worn shape and volume, "
-                           "but the body inside has been COMPLETELY DIGITALLY REMOVED. "
-                           "The garment appears HOLLOW and EMPTY inside — you can see into the neckline/collar opening. "
-                           "There is NO body, NO skin, NO mannequin form, NO human shape — "
-                           "ONLY the empty garment shell holding its shape as if the wearer vanished. "
-                           "Split into TWO HALVES inside this single panel: "
-                           "LEFT HALF = FRONT VIEW, RIGHT HALF = BACK VIEW (rotated 180°). "
-                           "Both halves on clean white background. NO bottom wear. "
-                           "Just the top piece in both halves, perfectly lit, premium e-commerce photography.")
-        elif _matches(gt, _LOWER):
-            hero_desc = ("HERO — WAIST-DOWN HALF-BODY SHOT of model wearing the garment. "
-                         "Camera frames from HIP TO TOE ONLY — crop the image at the hip/waist line. "
-                         "DO NOT prominently show face or upper body. The top edge of the frame is at the hip. "
-                         "The BOTTOM garment fills 70-80% of the visible area. "
-                         "Show waistband, drape, pattern, and silhouette prominently. "
-                         "This is a LOWER-BODY focused shot, NOT a full-body shot. "
-                         "Confident standing pose, soft studio lighting.")
-            detail_desc = ("CLOSE-UP of the BOTTOM on the model — camera zooms into the lower body. "
-                           "Show waistband, fabric drape, pattern detail, hem, fit silhouette. "
-                           "Camera focuses ONLY on the bottom garment piece.")
-            threed_desc = ("PROFESSIONAL GHOST MANNEQUIN PHOTOGRAPHY (hollow-man technique) — "
-                           "ONLY the BOTTOM garment retains its natural 3D worn shape and volume, "
-                           "but the body inside has been COMPLETELY DIGITALLY REMOVED. "
-                           "The garment appears HOLLOW and EMPTY inside — you can see into the waistband opening. "
-                           "There is NO body, NO skin, NO mannequin form, NO human shape — "
-                           "ONLY the empty garment shell holding its shape as if the wearer vanished. "
-                           "Split into TWO HALVES inside this single panel: "
-                           "LEFT HALF = FRONT VIEW, RIGHT HALF = BACK VIEW (rotated 180°). "
-                           "Both halves on clean white background. NO top wear. "
-                           "Just the bottom piece in both halves, perfectly lit, premium e-commerce photography.")
-        else:
-            # Unknown type → default to full-body (safest)
-            hero_desc = ("HERO — Model wearing the garment, full body HEAD TO TOE. "
-                         "The complete outfit fills the frame. "
-                         "Front-facing, confident pose, showing the full garment clearly. "
-                         "Soft studio lighting, clean background.")
-            detail_desc = ("CLOSE-UP of the outfit on the model — showing fabric texture, "
-                           "embroidery, print/logo, embellishments, and craftsmanship "
-                           "details up close on the model.")
-            threed_desc = ("PROFESSIONAL GHOST MANNEQUIN PHOTOGRAPHY (hollow-man technique) — "
-                           "the COMPLETE OUTFIT retains its natural 3D worn shape and volume, "
-                           "but the body inside has been COMPLETELY DIGITALLY REMOVED. "
-                           "The garment appears HOLLOW and EMPTY inside — you can see into the neckline/collar opening. "
-                           "There is NO body, NO skin, NO mannequin form, NO human shape — "
-                           "ONLY the empty garment shell holding its shape as if the wearer vanished. "
-                           "Split into TWO HALVES inside this single panel: "
-                           "LEFT HALF = FRONT VIEW, RIGHT HALF = BACK VIEW (rotated 180°). "
-                           "Both halves on clean white background. "
-                           "Full garment visible neckline to hem in BOTH halves, perfectly lit, premium e-commerce photography.")
-
-        # ---- Build 6 panels ----
+        # ---- Build 6 panels from config ----
         panels = [
-            hero_desc,
-            "Back full-body view — showing the back design/print/pattern and fit of the garment",
-            "3/4 angle view from the right — showing the silhouette, sleeve detail, and garment drape",
-            detail_desc,
-            "Walking or movement pose — showing garment flow, drape, and silhouette in motion",  # Panel 5: walking
-            threed_desc,       # Panel 6: LOCKED — 3D product FRONT + BACK
+            cfg["hero"],       # Panel 1: Hero
+            cfg["back"],       # Panel 2: Back view
+            cfg["angle"],      # Panel 3: 3/4 angle
+            cfg["detail"],     # Panel 4: Close-up
+            cfg["movement"],   # Panel 5: Walking / motion
+            cfg["threed"],     # Panel 6: LOCKED — 3D ghost mannequin
         ]
 
         # ---- Assign uploaded image references to panels 0-4 ----
@@ -293,7 +493,7 @@ class OpenAIImageProvider(ImageProvider):
             if shows == "front":
                 panels[slot] = f"Front view — REPRODUCE IMAGE {idx} (FRONT) EXACTLY. {details}. Full garment visible head to toe."
             elif shows == "back":
-                panels[slot] = f"Back full-body view — REPRODUCE IMAGE {idx} (BACK) EXACTLY. {details}. Show the back of the garment as in the reference."
+                panels[slot] = f"Back view — REPRODUCE IMAGE {idx} (BACK) EXACTLY. {details}. Show the back of the garment as in the reference."
             elif shows == "side":
                 panels[slot] = f"Side/3-quarter view — REPRODUCE the angle from IMAGE {idx} (SIDE). {details}."
             elif shows == "detail":
@@ -376,6 +576,10 @@ STUDY EACH reference photo individually. Each image shows a SPECIFIC angle or co
 NOTE: The reference may be a COMPOSITE image with labeled sections (FRONT, BACK, etc.) side by side — treat each labeled section as a separate reference.
 For each panel that has a matching reference image, REPRODUCE that reference EXACTLY. For panels without a direct reference, use ALL provided references to maintain garment consistency."""
 
+        # Classify garment and get config
+        category = _classify_garment(garment_type)
+        cfg = _GARMENT_CONFIGS.get(category, _GARMENT_CONFIGS["full"])
+
         # Build DYNAMIC 6-panel descriptions based on what was uploaded
         panel_descriptions = self._build_dynamic_panels(uploaded_image_info or [], garment_type=garment_type)
         pose_list = "\n".join(
@@ -406,6 +610,8 @@ IMPORTANT PANEL LAYOUT:
 - The reference photos are LOW QUALITY but the garment details are real. Study ALL of them carefully:
   • If MULTIPLE reference images are provided, they show DIFFERENT ANGLES of the SAME garment (front, back, detail). Use ALL angles to reconstruct the complete garment faithfully.
   • The BACK VIEW reference (if provided) must be accurately reproduced in the back-facing panel (Panel 2). Match the back design, print, pattern, closure, and detailing EXACTLY as shown in the back reference photo.
+
+{cfg["product_focus"]}
 
 📝 TEXT REPRODUCTION RULES:
   • Read EVERY word, letter, and number printed on the garment from the reference photos
@@ -464,7 +670,8 @@ PHOTOGRAPHY RULES:
 - Natural, warm lighting — the output should look like a premium lookbook
 - Clean, simple backgrounds (not distracting)
 - NO text, watermarks, labels, or panel numbers anywhere on the image
-- Despite the low-quality reference input, the OUTPUT must be crisp, sharp, and professional"""
+- Despite the low-quality reference input, the OUTPUT must be crisp, sharp, and professional
+- {cfg["photography_note"]}"""
 
         if extra_prompt:
             full_prompt += f"\n\nADDITIONAL STYLING NOTES: {extra_prompt}"
@@ -849,6 +1056,11 @@ STUDY EACH reference photo carefully. Each shows a SPECIFIC angle or component.
 For panels with a matching reference, REPRODUCE that reference EXACTLY.
 For panels without a direct reference, use ALL references for consistency."""
 
+        # ---- Classify garment and get config ----
+        category = _classify_garment(garment_type)
+        cfg = _GARMENT_CONFIGS.get(category, _GARMENT_CONFIGS["full"])
+        _log(f"Garment classification: '{garment_type}' → {category}")
+
         # ---- Build dynamic 6-panel descriptions ----
         panel_descriptions = OpenAIImageProvider._build_dynamic_panels(uploaded_image_info or [], garment_type=garment_type)
         pose_list = "\n".join(
@@ -876,6 +1088,8 @@ IMPORTANT PANEL LAYOUT:
 - Study ALL reference angles to capture every design element from every angle
 - If BACK view reference is provided, Panel 2 MUST match it exactly
 - If MULTIPLE references are provided, they show DIFFERENT ANGLES of the SAME garment
+
+{cfg["product_focus"]}
 
 📝 TEXT REPRODUCTION RULES:
   • Read EVERY word, letter, and number printed on the garment from the reference photos
@@ -931,7 +1145,8 @@ PHOTOGRAPHY RULES:
 - Natural, warm lighting — premium lookbook quality
 - Clean, simple backgrounds (not distracting)
 - NO text, watermarks, labels, or panel numbers on the image
-- Output must be crisp, sharp, and professional regardless of input quality"""
+- Output must be crisp, sharp, and professional regardless of input quality
+- {cfg["photography_note"]}"""
 
         if extra_prompt:
             full_prompt += f"\n\nADDITIONAL STYLING NOTES: {extra_prompt}"
