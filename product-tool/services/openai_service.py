@@ -103,7 +103,7 @@ MODEL_PROMPT RULES — ACT AS A FASHION STYLIST:
 - MUST say "editorial fashion photography" and mention lighting.
 
 Allowed collection handles:
-kurti, kurti-set, kurthi-set, suits, indo-western, tops, top, casual-top, korean-top, shirt, blouse, bodycon, fancy-crop-top, top-wear, single-piece, gown, gown-1, maxi, casual-maxi, cord-set, bottom, bottom-1, plazo, skirt, inners, panties, skin-care, face-wash, body-lotion, hair-mask, face-mask, foot-mask, bb-cream, eye-lashes, fix-spray, powder, sun-screen, hand-cream, mascara, washing-soap
+kurti, kurti-set, kurthi-set, suits, indo-western, tops, top, casual-top, korean-top, shirt, blouse, bodycon, fancy-crop-top, crop-top, fancy-top, knitting-top, tan-top, t-shirt, top-wear, single-piece, gown, gown-1, maxi, casual-maxi, cord-set, bottom, bottom-1, jeans, plazo, skirt, inners, panties, accessories, bag, casual-slipper, skin-care, face-wash, body-lotion, hair-mask, face-mask, foot-mask, bb-cream, eye-lashes, fix-spray, powder, sun-screen, hand-cream, mascara, washing-soap
 
 TAG RULES:
 - Generate EXACTLY 35-50 tags (no fewer)
