@@ -1113,22 +1113,57 @@ PHOTOGRAPHY RULES:
 
         # ---- Build outfit description with slots ----
         outfit_parts = []
+        # Track categories for layering detection
+        cat_counts = {}
+        for i, brief in enumerate(garment_briefs):
+            cat = garment_categories[i] if i < len(garment_categories) else "garment"
+            cat_counts[cat] = cat_counts.get(cat, 0) + 1
+
+        upper_idx = 0  # track layering order within same category
         for i, brief in enumerate(garment_briefs):
             cat = garment_categories[i] if i < len(garment_categories) else "garment"
             slot = {"upper_body": "on upper body", "lower_body": "on lower body",
                     "full_body": "as complete outfit"}.get(cat, "")
+            # Add layering context when multiple garments share a category
+            if cat_counts.get(cat, 0) > 1 and cat in ("upper_body", "full_body"):
+                # First garment = base layer, subsequent = outer layer
+                layer_items = [j for j in range(i+1) if (garment_categories[j] if j < len(garment_categories) else "") == cat]
+                if len(layer_items) <= 1:
+                    slot += " — base layer"
+                else:
+                    slot += " — outer layer, worn OVER the previous"
+            # Handle full_body + upper_body combo (jacket over dress)
+            if cat == "upper_body" and "full_body" in cat_counts:
+                slot = "layered OVER the full outfit"
             outfit_parts.append(f"- {brief} ({slot})" if slot else f"- {brief}")
         outfit_desc = "\n".join(outfit_parts)
 
         # ---- Build complementary accessories based on garment categories ----
         cats = set(garment_categories)
         accessory_instructions = ""
-        if "full_body" in cats:
+        if "full_body" in cats and "upper_body" in cats:
+            # Full outfit + top layering (e.g., dress + jacket)
+            accessory_instructions = """COMPLETE THE LOOK with:
+- The top/jacket MUST be worn visibly OVER the full outfit — both garments fully visible
+- Matching footwear appropriate to the combined outfit style
+- Minimal accessories — the outfit combination is the star
+- The layered top should look naturally styled over the base outfit"""
+        elif "full_body" in cats:
             accessory_instructions = """COMPLETE THE LOOK with:
 - Matching footwear (heels, block heels, or ethnic juttis depending on outfit style)
 - A small elegant bag or clutch that complements the outfit
 - Dainty earrings or studs that match the outfit's vibe
 - Keep accessories subtle — the garment is the star"""
+        elif "upper_body" in cats and "lower_body" in cats:
+            # Top + bottom combo (possibly with layered tops)
+            multi_tops = sum(1 for c in garment_categories if c == "upper_body") > 1
+            if multi_tops:
+                accessory_instructions = """COMPLETE THE LOOK with:
+- ALL tops MUST be visible — layer them naturally (inner shirt/base visible, outer jacket/cardigan on top)
+- Matching footwear and minimal accessories
+- The layered look should feel intentional and styled"""
+            else:
+                accessory_instructions = """COMPLETE THE LOOK with matching footwear and minimal accessories."""
         elif "upper_body" in cats and "lower_body" not in cats:
             accessory_instructions = """COMPLETE THE LOOK with:
 - Stylish complementary bottom wear that suits the top's aesthetic
@@ -1317,12 +1352,38 @@ OUTPUT: Generate a SINGLE high-quality fashion editorial photo of this person.
 
         # ---- Build outfit description ----
         outfit_parts = []
+        cat_counts = {}
+        for i, brief in enumerate(garment_briefs):
+            cat = garment_categories[i] if i < len(garment_categories) else "garment"
+            cat_counts[cat] = cat_counts.get(cat, 0) + 1
+
         for i, brief in enumerate(garment_briefs):
             cat = garment_categories[i] if i < len(garment_categories) else "garment"
             slot = {"upper_body": "on upper body", "lower_body": "on lower body",
                     "full_body": "as complete outfit"}.get(cat, "")
+            # Layering context for multiple garments in same category
+            if cat_counts.get(cat, 0) > 1 and cat in ("upper_body", "full_body"):
+                layer_items = [j for j in range(i+1) if (garment_categories[j] if j < len(garment_categories) else "") == cat]
+                if len(layer_items) <= 1:
+                    slot += " — base layer"
+                else:
+                    slot += " — outer layer, worn OVER the previous"
+            if cat == "upper_body" and "full_body" in cat_counts:
+                slot = "layered OVER the full outfit"
             outfit_parts.append(f"- {brief} ({slot})" if slot else f"- {brief}")
         outfit_desc = "\n".join(outfit_parts)
+
+        # ---- Layering instruction (added when multiple garments overlap) ----
+        layering_note = ""
+        if len(garment_briefs) > 1:
+            has_layering = cat_counts.get("upper_body", 0) > 1 or ("full_body" in cat_counts and "upper_body" in cat_counts)
+            if has_layering:
+                layering_note = """
+🧥 LAYERING RULES:
+- When multiple garments target the same body area, LAYER them naturally
+- Inner/base garments go underneath, outer garments (jackets, cardigans) go on top
+- ALL garments MUST be clearly visible in the final result — no garment should be hidden
+- The layered look should feel intentional and fashion-forward"""
 
         # ---- Build design details section ----
         design_checklist = ""
@@ -1385,7 +1446,7 @@ The CUSTOMER from the photo above is the model — she is wearing THIS EXACT GAR
 
 GARMENT TO WEAR:
 {outfit_desc}
-
+{layering_note}
 {styling}
 
 IMPORTANT PANEL LAYOUT:
