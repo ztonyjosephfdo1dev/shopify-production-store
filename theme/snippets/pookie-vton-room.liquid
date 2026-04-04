@@ -13,8 +13,8 @@
 {{ 'pookie-vton-room.css' | asset_url | stylesheet_tag }}
 
 <!-- Floating Action Button -->
-<button class="pm-fab" id="pm-fab" aria-label="Open Pookie Mirror" title="✨ Try it on!">
-  ✨
+<button class="pm-fab" id="pm-fab" aria-label="Open Pookie Mirror" title="Try it on!">
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12,2 14.4,9.6 22,12 14.4,14.4 12,22 9.6,14.4 2,12 9.6,9.6"/></svg>
   <span class="pm-fab__badge" id="pm-fab-badge"></span>
 </button>
 
@@ -24,8 +24,8 @@
 <!-- Drawer -->
 <div class="pm-drawer" id="pm-drawer" role="dialog" aria-label="Pookie Mirror">
   <div class="pm-drawer__header">
-    <div class="pm-drawer__title">✨ Pookie Mirror</div>
-    <button class="pm-drawer__close" id="pm-close" aria-label="Close">&times;</button>
+    <div class="pm-drawer__title"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12,2 14.4,9.6 22,12 14.4,14.4 12,22 9.6,14.4 2,12 9.6,9.6"/></svg> Pookie Mirror</div>
+    <button class="pm-drawer__close" id="pm-close" aria-label="Close"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
   </div>
   <div class="pm-drawer__body" id="pm-body">
     <!-- Dynamic content rendered by JS -->
@@ -70,6 +70,24 @@
     { text: 'Slay first, adult later.', by: '' },
     { text: 'Fashion fades, only style remains the same.', by: 'Coco Chanel' },
   ];
+
+  /* ================================================================
+     SVG ICONS (Feather-style, matches site-wide pattern)
+     ================================================================ */
+  function _ic(d, s) { s = s || 20; return '<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>'; }
+  const IC = {
+    sparkle:  _ic('<polygon points="12,2 14.4,9.6 22,12 14.4,14.4 12,22 9.6,14.4 2,12 9.6,9.6"/>'),
+    camera:   _ic('<path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/>'),
+    plus:     _ic('<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>'),
+    x:        _ic('<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'),
+    check:    _ic('<polyline points="20 6 9 17 4 12"/>'),
+    bag:      _ic('<path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/>'),
+    download: _ic('<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>'),
+    refresh:  _ic('<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>'),
+    volOn:    _ic('<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/>'),
+    volOff:   _ic('<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/>'),
+    image:    _ic('<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>'),
+  };
 
   /* ================================================================
      STATE
@@ -459,13 +477,13 @@
     return _TYPE_CAT[ptype] || 'full_body';
   }
 
-  /** Get emoji icon for a garment category */
+  /** Category badge (colored dot + label) */
   function _catIcon(cat) {
     cat = (cat || '').toLowerCase();
-    if (cat.includes('coord')) return '👔';
-    if (cat.includes('lower') || cat.includes('bottom')) return '👖';
-    if (cat.includes('full') || cat.includes('dress')) return '👗';
-    return '👕';
+    if (cat.includes('coord')) return '<span class="pm-cat-dot" style="background:#b08968"></span>';
+    if (cat.includes('lower') || cat.includes('bottom')) return '<span class="pm-cat-dot" style="background:#5b7fa3"></span>';
+    if (cat.includes('full') || cat.includes('dress')) return '<span class="pm-cat-dot" style="background:#c246dc"></span>';
+    return '<span class="pm-cat-dot" style="background:#4a9e7d"></span>';
   }
   /** Get short label for a garment category */
   function _catLabel(cat) {
@@ -740,7 +758,7 @@
       el.play().catch(() => {});
     }
     const btn = body.querySelector('.pm-show__audio-btn');
-    if (btn) btn.textContent = state.audioPlaying ? '🔊' : '🔇';
+    if (btn) btn.innerHTML = state.audioPlaying ? IC.volOn : IC.volOff;
   }
 
   function _autoStartAudio() {
@@ -780,12 +798,12 @@
     let html = '';
 
     // ---- Photo gallery section ----
-    html += `<p class="pm-section-title">📸 Your Photos${state.photos.length > 0 ? ' (' + state.photos.length + '/' + MAX_PHOTOS + ')' : ''}</p>`;
+    html += `<p class="pm-section-title">${IC.camera} Your Photos${state.photos.length > 0 ? ' (' + state.photos.length + '/' + MAX_PHOTOS + ')' : ''}</p>`;
 
     if (state.photos.length === 0) {
       // Empty state — prominent upload CTA
       html += `<div class="pm-photo-empty" onclick="document.getElementById('pm-file-input').click()">
-        <div class="pm-photo-empty__icon">📷</div>
+        <div class="pm-photo-empty__icon">${IC.image}</div>
         <div class="pm-photo-empty__text">Upload your photo to try on outfits</div>
         <div class="pm-photo-empty__hint">Tap to add a photo (max ${MAX_PHOTOS})</div>
       </div>`;
@@ -798,22 +816,22 @@
           <div class="pm-photos__slot pm-photos__slot--filled ${selected ? 'pm-photos__slot--selected' : ''}"
                onclick="window._pm.selectPhoto(${i})">
             <img src="${photo.dataUrl}" alt="Photo ${i+1}">
-            ${selected ? '<span class="pm-photos__check">✓</span>' : ''}
-            <button class="pm-photos__remove" onclick="event.stopPropagation(); window._pm.removePhoto(${i})">&times;</button>
+            ${selected ? '<span class="pm-photos__check">' + IC.check + '</span>' : ''}
+            <button class="pm-photos__remove" onclick="event.stopPropagation(); window._pm.removePhoto(${i})">${IC.x}</button>
           </div>`;
       });
       // Add button (only if under limit)
       if (state.photos.length < MAX_PHOTOS) {
         html += `
           <div class="pm-photos__slot pm-photos__slot--add" onclick="document.getElementById('pm-file-input').click()">
-            <span class="pm-photos__add-icon">+</span>
+            <span class="pm-photos__add-icon">${IC.plus}</span>
           </div>`;
       }
       html += '</div>';
     }
 
     // ---- Outfit garments section ----
-    html += `<p class="pm-section-title">👗 Your Outfit${state.outfitGarments.length > 0 ? ' (' + state.outfitGarments.length + '/' + MAX_GARMENTS + ')' : ''}</p>`;
+    html += `<p class="pm-section-title">${IC.sparkle} Your Outfit${state.outfitGarments.length > 0 ? ' (' + state.outfitGarments.length + '/' + MAX_GARMENTS + ')' : ''}</p>`;
 
     if (state.outfitGarments.length > 0) {
       html += '<div class="pm-outfit">';
@@ -826,7 +844,7 @@
             <div class="pm-outfit__card-name">${g.title}</div>
             <div class="pm-outfit__card-badge">${icon} ${label}</div>
           </div>
-          <button class="pm-outfit__card-remove" onclick="window._pm.removeGarment(${i})">&times;</button>
+          <button class="pm-outfit__card-remove" onclick="window._pm.removeGarment(${i})">${IC.x}</button>
         </div>`;
       });
       html += '</div>';
@@ -849,7 +867,7 @@
     // ---- Cart items tray ----
     const availableCartItems = state.cartItems.filter(item => !assignedIds.has(item.id));
     if (state.cartItems.length > 0) {
-      html += '<p class="pm-section-title">🛒 From Your Cart</p>';
+      html += '<p class="pm-section-title">' + IC.bag + ' From Your Cart</p>';
       if (availableCartItems.length > 0 && state.outfitGarments.length < MAX_GARMENTS) {
         html += '<div class="pm-tray">';
         state.cartItems.forEach((item, i) => {
@@ -867,7 +885,7 @@
         html += '<p class="pm-hint">All cart items added to your outfit</p>';
       }
     } else {
-      html += '<div class="pm-empty"><div class="pm-empty__icon">🛒</div>Your cart is empty.<br>Add items to try them on!</div>';
+      html += '<div class="pm-empty"><div class="pm-empty__icon">' + IC.bag + '</div>Your cart is empty.<br>Add items to try them on!</div>';
     }
 
     body.innerHTML = html;
@@ -881,7 +899,7 @@
       </p></div>`;
     } else {
       footerHtml = `<button class="pm-generate" ${canGenerate ? '' : 'disabled'} onclick="window._pm.generate()">
-        ✨ See My Look (${remaining} left)
+        ${IC.sparkle} See My Look (${remaining} left)
       </button>`;
     }
     footer.innerHTML = footerHtml;
@@ -901,7 +919,7 @@
       <div class="pm-loading pm-loading--fullscreen">
         <div class="pm-loading__shimmer"></div>
         <div class="pm-loading__text">
-          <span class="pm-loading__spinner">✨</span> Creating your fashion show...
+          <span class="pm-loading__spinner"></span> Creating your fashion show...
         </div>
         <div class="pm-quote" id="pm-quote">${quoteHtml}</div>
         <small class="pm-loading__sub">Your look is being styled (15-30 seconds)</small>
@@ -939,12 +957,12 @@
     // Overlay controls inside the stage
     html += `<div class="pm-show__overlay-top">
       <div class="pm-show__counter">${state.currentPanel + 1} / ${state.panels.length}</div>
-      <button class="pm-show__audio-btn pm-show__audio-btn--overlay" onclick="window._pm.toggleAudio()">${state.audioPlaying ? '🔊' : '🔇'}</button>
+      <button class="pm-show__audio-btn pm-show__audio-btn--overlay" onclick="window._pm.toggleAudio()">${state.audioPlaying ? IC.volOn : IC.volOff}</button>
     </div>`;
 
     // "Loading more looks..." badge (shown while grid is still loading)
     if (state.gridLoading) {
-      html += '<div class="pm-show__loading-badge"><span class="pm-loading__spinner">✨</span> Loading more looks...</div>';
+      html += '<div class="pm-show__loading-badge"><span class="pm-loading__spinner"></span> Loading more looks...</div>';
     }
 
     // Dots at bottom of stage
@@ -960,8 +978,8 @@
 
     // Action bar pinned at bottom
     html += `<div class="pm-show__action-bar">
-      <button class="pm-show__action" onclick="window._pm.download()">📥 Save</button>
-      <button class="pm-show__action pm-show__action--primary" onclick="window._pm.tryAgain()">🔄 Try Again</button>
+      <button class="pm-show__action" onclick="window._pm.download()">${IC.download} Save</button>
+      <button class="pm-show__action pm-show__action--primary" onclick="window._pm.tryAgain()">${IC.refresh} Try Again</button>
     </div>`;
 
     html += '</div>';

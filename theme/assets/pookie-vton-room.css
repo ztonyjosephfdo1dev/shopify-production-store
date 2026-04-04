@@ -178,7 +178,11 @@
   letter-spacing: 0.05em;
   color: var(--pm-text-muted);
   margin: 0 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
+.pm-section-title svg { width: 16px; height: 16px; }
 .pm-section-title:not(:first-child) { margin-top: 24px; }
 
 /* ---- Photo Manager ---- */
@@ -217,7 +221,11 @@
 .pm-photos__add-icon {
   font-size: 28px;
   color: var(--pm-text-hint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+.pm-photos__add-icon svg { width: 28px; height: 28px; }
 .pm-photos__remove {
   position: absolute;
   top: 4px;
@@ -235,6 +243,7 @@
   justify-content: center;
   line-height: 1;
 }
+.pm-photos__remove svg { width: 12px; height: 12px; }
 .pm-photos__slot--filled:hover .pm-photos__remove { display: flex; }
 
 /* Selected photo check badge */
@@ -255,6 +264,7 @@
   line-height: 1;
   pointer-events: none;
 }
+.pm-photos__check svg { width: 14px; height: 14px; }
 
 /* Add button (smaller, dashed) */
 .pm-photos__slot--add {
@@ -279,7 +289,14 @@
   border-color: var(--pm-accent);
   background: var(--pm-accent-light);
 }
-.pm-photo-empty__icon { font-size: 36px; margin-bottom: 8px; }
+.pm-photo-empty__icon {
+  font-size: 36px;
+  margin-bottom: 8px;
+  color: var(--pm-text-hint);
+  display: flex;
+  justify-content: center;
+}
+.pm-photo-empty__icon svg { width: 40px; height: 40px; }
 .pm-photo-empty__text {
   font-size: 15px;
   font-weight: 600;
@@ -446,7 +463,14 @@
   text-align: center;
 }
 .pm-loading__spinner {
-  animation: pm-spin 1s infinite linear;
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: pm-spin 0.8s infinite linear;
+  vertical-align: middle;
 }
 @keyframes pm-spin {
   to { transform: rotate(360deg); }
@@ -510,7 +534,7 @@
 .pm-show__panel img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
 }
 .pm-show__counter {
   background: rgba(0,0,0,0.55);
@@ -721,7 +745,14 @@
   color: var(--pm-text-hint);
   font-size: 14px;
 }
-.pm-empty__icon { font-size: 36px; margin-bottom: 8px; }
+.pm-empty__icon {
+  font-size: 36px;
+  margin-bottom: 8px;
+  color: var(--pm-text-hint);
+  display: flex;
+  justify-content: center;
+}
+.pm-empty__icon svg { width: 40px; height: 40px; }
 
 /* ---- Mobile tweaks (full-screen on all devices, just adjust padding) ---- */
 @media (max-width: 600px) {
@@ -792,7 +823,7 @@
 .pm-show__panel img {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   will-change: transform;
 }
 
@@ -867,3 +898,28 @@
   0%   { transform: scale(0.92); opacity: 0; filter: brightness(1.3); }
   100% { transform: scale(1); opacity: 1; filter: brightness(1); }
 }
+
+/* ---- SVG icon alignment (global for the drawer) ---- */
+.pm-drawer svg {
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+/* Category color dot */
+.pm-cat-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  vertical-align: middle;
+  margin-right: 2px;
+}
+
+/* Button SVG icon alignment */
+.pm-generate svg,
+.pm-show__action svg,
+.pm-show__audio-btn svg {
+  flex-shrink: 0;
+}
+.pm-outfit__card-remove svg { width: 14px; height: 14px; }
+.pm-drawer__close svg { flex-shrink: 0; }
