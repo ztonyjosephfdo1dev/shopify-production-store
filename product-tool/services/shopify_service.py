@@ -429,7 +429,7 @@ def create_product(
             }
         )
 
-    # Step 1: Create product WITH productOptions (auto-creates variants per size)
+    # Step 1: Create product WITH productOptions (creates first variant only)
     create_mutation = """
     mutation productCreate($product: ProductCreateInput!, $media: [CreateMediaInput!]) {
         productCreate(product: $product, media: $media) {
@@ -438,6 +438,10 @@ def create_product(
                 handle
                 title
                 status
+                options {
+                    id
+                    name
+                }
                 variants(first: 30) {
                     nodes {
                         id
@@ -510,20 +514,70 @@ def create_product(
         except Exception as e:
             print(f"[shopify] Product category set failed (non-fatal): {e}")
 
-    # Step 2: Update variants with correct price/compareAtPrice
-    # (productCreate with productOptions auto-creates variants at $0.00;
-    #  we must update them, not re-create them)
+    # Step 2: Create remaining variants via productVariantsBulkCreate
+    # (productCreate only creates the FIRST variant; extra sizes need explicit creation)
     variant_nodes = product.get("variants", {}).get("nodes", [])
     if not variant_nodes:
         print("[shopify] WARNING: No auto-created variants found in productCreate response")
-    else:
-        variants_update_input = []
-        for v in variant_nodes:
-            variants_update_input.append({
-                "id": v["id"],
-                "price": str(price),
-                "compareAtPrice": str(compare_at_price),
-            })
+
+    existing_size = variant_nodes[0]["title"] if variant_nodes else None
+    remaining_sizes = [s for s in sizes if s != existing_size]
+
+    if remaining_sizes and product_gid:
+        # Resolve the option ID for "Size"
+        product_options = product.get("options", [])
+        size_option = next((o for o in product_options if o.get("name") == "Size"), None)
+        if not size_option:
+            # Fallback: query the product for options
+            opt_data = _graphql(
+                """query getOpts($id: ID!) { product(id: $id) { options { id name } } }""",
+                {"id": product_gid},
+            )
+            product_options = opt_data.get("product", {}).get("options", [])
+            size_option = next((o for o in product_options if o.get("name") == "Size"), None)
+
+        if size_option:
+            bulk_variants = []
+            for s in remaining_sizes:
+                bulk_variants.append({
+                    "optionValues": [{"optionId": size_option["id"], "name": s}],
+                    "price": str(price),
+                    "compareAtPrice": str(compare_at_price),
+                })
+
+            bulk_create_data = _graphql(
+                """mutation variantsBulkCreate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
+                    productVariantsBulkCreate(productId: $productId, variants: $variants) {
+                        productVariants {
+                            id
+                            title
+                            inventoryItem { id }
+                        }
+                        userErrors { field message }
+                    }
+                }""",
+                {"productId": product_gid, "variants": bulk_variants},
+            )
+            bulk_result = bulk_create_data.get("productVariantsBulkCreate", {})
+            bulk_errors = bulk_result.get("userErrors", [])
+            if bulk_errors:
+                print(f"[shopify] Variant bulk-create errors: {json.dumps(bulk_errors)}")
+            else:
+                new_variants = bulk_result.get("productVariants", [])
+                variant_nodes.extend(new_variants)
+                print(f"[shopify] Created {len(new_variants)} additional variants: {remaining_sizes}")
+        else:
+            print("[shopify] WARNING: Could not find Size option for bulk variant creation")
+
+    # Step 3: Update first variant with correct price/compareAtPrice
+    # (productCreate sets first variant at $0.00)
+    if variant_nodes:
+        first_variant = variant_nodes[0]
+        variants_update_input = [{
+            "id": first_variant["id"],
+            "price": str(price),
+            "compareAtPrice": str(compare_at_price),
+        }]
 
         update_mutation = """
         mutation productVariantsBulkUpdate($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
@@ -554,17 +608,18 @@ def create_product(
         if variant_errors:
             raise Exception(f"Variant update errors: {json.dumps(variant_errors)}")
 
-        # Use the updated variant nodes (they have correct inventoryItem IDs)
+        # Use the updated first variant (has correct inventoryItem ID)
         updated_nodes = variant_result.get("productVariants", [])
         if updated_nodes:
-            variant_nodes = updated_nodes
+            # Replace only the first variant; keep bulk-created ones intact
+            variant_nodes[0] = updated_nodes[0]
         print(f"[shopify] Variants updated: {len(variant_nodes)} variants with price={price}, compareAt={compare_at_price}")
 
-    # Step 3: Activate inventory at location + set quantities
+    # Step 4: Activate inventory at location + set quantities
     if variant_nodes and inventory_quantity > 0:
         _activate_and_set_inventory(variant_nodes, inventory_quantity)
 
-    # Step 4: Publish to all sales channels
+    # Step 5: Publish to all sales channels
     if product_gid:
         _publish_to_channels(product_gid)
 
