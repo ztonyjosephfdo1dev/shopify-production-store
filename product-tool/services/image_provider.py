@@ -104,9 +104,11 @@ _3D_BASE = (
     "NOT hidden behind the front fabric panel. "
     "There is NO body, NO skin, NO mannequin form, NO human shape — "
     "ONLY the empty garment shell holding its shape as if the wearer vanished. "
-    "Split into TWO HALVES inside this single panel: "
-    "LEFT HALF = FRONT VIEW, RIGHT HALF = BACK VIEW (rotated 180°). "
-    "Both halves on clean white background. {extra}"
+    "This single panel contains TWO SEPARATE GARMENT PHOTOS stacked VERTICALLY: "
+    "TOP HALF = FRONT VIEW of the garment, BOTTOM HALF = BACK VIEW of the garment (rotated 180°). "
+    "The two views must be clearly SEPARATE — two distinct photos, one above the other. "
+    "Do NOT merge, blend, or overlap them. Each half shows the complete garment independently. "
+    "Both halves on clean white background, NO divider line between them. {extra}"
     "Perfectly lit, premium e-commerce photography."
 )
 
@@ -151,7 +153,7 @@ _GARMENT_CONFIGS = {
         "threed": _3D_BASE.format(
             scope="ONLY the TOP garment",
             opening="neckline/collar opening",
-            extra="NO bottom wear. Just the top piece in both halves. ",
+            extra="NO bottom wear. Top half: front showing neckline, sleeves, and print. Bottom half: back showing back closure, back print/pattern. ",
         ),
         "photography_note": (
             "Frame the model HEAD TO WAIST in every model panel. "
@@ -199,7 +201,7 @@ _GARMENT_CONFIGS = {
         "threed": _3D_BASE.format(
             scope="ONLY the BOTTOM garment",
             opening="waistband opening",
-            extra="NO top wear. Just the bottom piece in both halves. ",
+            extra="NO top wear. Top half: front showing waistband, drape, and pattern. Bottom half: back showing pockets, seam, and back fit. ",
         ),
         "photography_note": (
             "Frame the model HIP TO TOE in every model panel. "
@@ -242,7 +244,7 @@ _GARMENT_CONFIGS = {
         "threed": _3D_BASE.format(
             scope="the COMPLETE OUTFIT",
             opening="neckline/collar opening",
-            extra="Full garment visible neckline to hem in BOTH halves. ",
+            extra="Top half: front view neckline to hem. Bottom half: back view neckline to hem. ",
         ),
         "photography_note": (
             "Frame the model HEAD TO TOE in every model panel. "
@@ -285,7 +287,7 @@ _GARMENT_CONFIGS = {
         "threed": _3D_BASE.format(
             scope="the COMPLETE COORD SET (both pieces)",
             opening="neckline/collar opening",
-            extra="Show BOTH pieces — top and bottom — as a complete set in both halves. ",
+            extra="Top half: front of both pieces as a complete set. Bottom half: back of both pieces as a complete set. ",
         ),
         "photography_note": (
             "Frame the model HEAD TO TOE in every model panel. "
@@ -326,8 +328,11 @@ _GARMENT_CONFIGS = {
         ),
         "threed": (
             "SHOES ONLY on clean white background — NO model, NO person. "
-            "LEFT HALF = pair of shoes from front/top-down angle showing both shoes together. "
-            "RIGHT HALF = single shoe from side profile showing sole, heel, and silhouette. "
+            "This single panel contains TWO SEPARATE SHOE PHOTOS stacked VERTICALLY: "
+            "TOP HALF = pair of shoes from front/top-down angle showing both shoes together. "
+            "BOTTOM HALF = single shoe from side profile showing sole, heel, and silhouette. "
+            "The two views must be clearly SEPARATE — two distinct photos, one above the other. "
+            "Do NOT merge or overlap them. "
             "Premium e-commerce product photography, perfectly lit."
         ),
         "photography_note": (
@@ -607,7 +612,7 @@ Generate a single image containing a 2-column × 3-row grid (6 panels total) of 
 
 IMPORTANT PANEL LAYOUT:
 - Panels 1-5: MODEL wearing the garment in various poses and camera framings (see panel descriptions below for each).
-- Panel 6 (Row 3, Right): 3D PRODUCT SHOT — FRONT + BACK of garment FLOATING IN MID-AIR (invisible mannequin — mannequin must NOT be visible). LEFT HALF = FRONT VIEW, RIGHT HALF = BACK VIEW. NO model/person, NO visible mannequin body. Clean white background, premium e-commerce product photography.
+- Panel 6 (Row 3, Right): 3D PRODUCT SHOT — FRONT + BACK of garment FLOATING IN MID-AIR (invisible mannequin — mannequin must NOT be visible). Two separate garment photos stacked vertically: TOP HALF = FRONT VIEW, BOTTOM HALF = BACK VIEW. The two views must be clearly separate, not merged or blended. NO model/person, NO visible mannequin body. Clean white background, premium e-commerce product photography.
 
 ⚠️ GARMENT FIDELITY — THIS IS THE ABSOLUTE #1 PRIORITY:
 - The reference photos are LOW QUALITY but the garment details are real. Study ALL of them carefully:
@@ -665,7 +670,7 @@ GRID STRUCTURE RULES:
 - ALL panels must be EQUAL SIZE — each panel is exactly 1/6th of the total image
 - Panels 1-4: SAME model in all 4 panels (same face, hair, skin tone, body)
 - Panel 5: SAME model, walking/movement pose
-- Panel 6: 3D product shot — FRONT + BACK of garment FLOATING (invisible mannequin — NOT visible), NO person
+- Panel 6: 3D product shot — two separate photos stacked vertically: TOP HALF = FRONT, BOTTOM HALF = BACK, garment FLOATING (invisible mannequin — NOT visible), NO person
 - Model FULLY VISIBLE in each model panel — no cropping at edges
 
 PHOTOGRAPHY RULES:
@@ -1084,7 +1089,7 @@ Generate a single image containing a 2-column × 3-row grid (6 panels total) of 
 
 IMPORTANT PANEL LAYOUT:
 - Panels 1-5: MODEL wearing the garment in various poses and camera framings (see panel descriptions below for each).
-- Panel 6 (Row 3, Right): 3D PRODUCT SHOT — FRONT + BACK of garment FLOATING IN MID-AIR (invisible mannequin — mannequin must NOT be visible). LEFT HALF = FRONT VIEW, RIGHT HALF = BACK VIEW. NO model/person, NO visible mannequin body. Clean white background, premium e-commerce product photography.
+- Panel 6 (Row 3, Right): 3D PRODUCT SHOT — FRONT + BACK of garment FLOATING IN MID-AIR (invisible mannequin — mannequin must NOT be visible). Two separate garment photos stacked vertically: TOP HALF = FRONT VIEW, BOTTOM HALF = BACK VIEW. The two views must be clearly separate, not merged or blended. NO model/person, NO visible mannequin body. Clean white background, premium e-commerce product photography.
 
 ⚠️ GARMENT FIDELITY — THIS IS THE ABSOLUTE #1 PRIORITY:
 - The garment in EVERY panel must be a PIXEL-PERFECT reproduction of the reference photos
@@ -1140,7 +1145,7 @@ GRID STRUCTURE RULES:
 - ALL panels EQUAL SIZE — each panel is exactly 1/6th of the total image
 - Panels 1-4: SAME model in all 4 panels (same face, hair, skin tone, body)
 - Panel 5: SAME model, walking/movement pose
-- Panel 6: 3D product shot — FRONT + BACK of garment FLOATING (invisible mannequin — NOT visible), NO person
+- Panel 6: 3D product shot — two separate photos stacked vertically: TOP HALF = FRONT, BOTTOM HALF = BACK, garment FLOATING (invisible mannequin — NOT visible), NO person
 - Model FULLY VISIBLE in each model panel — no cropping at edges
 
 PHOTOGRAPHY RULES:
